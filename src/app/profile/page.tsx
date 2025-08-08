@@ -1,15 +1,27 @@
+"use client";
 
-'use client';
-
-import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { useUser } from '@/hooks/use-user';
-import { logout, requestRoleChange } from '@/app/actions/auth';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useToast } from '@/hooks/use-toast';
-import { FormEvent } from 'react';
+import { useRouter } from "next/navigation";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useUser } from "@/hooks/use-user";
+import { logout, requestRoleChange } from "@/app/actions/auth-supabase";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { FormEvent, useEffect } from "react";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -18,47 +30,72 @@ export default function ProfilePage() {
 
   const handleLogout = async () => {
     await logout();
+    // Dispatch logout event for other components to listen to
+    window.dispatchEvent(new Event("logout"));
     mutate(); // Trigger re-fetch of session
-    router.push('/login');
+    router.push("/login");
   };
 
   const handleRoleRequest = async (e: FormEvent<HTMLFormElement>) => {
-      e.preventDefault();
-      if (!user) return;
-      
-      const formData = new FormData(e.currentTarget);
-      const newRole = formData.get('role') as string;
+    e.preventDefault();
+    if (!user) return;
 
-      if (!newRole) {
-          toast({ variant: "destructive", title: "Error", description: "Please select a role to request." });
-          return;
+    const formData = new FormData(e.currentTarget);
+    const newRole = formData.get("role") as string;
+
+    if (!newRole) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please select a role to request.",
+      });
+      return;
+    }
+
+    try {
+      const result = await requestRoleChange(user.uid, newRole);
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: "Your role change request has been submitted.",
+        });
+        mutate(); // Re-fetch user session to show updated desiredRole
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: result.message,
+        });
       }
-      
-      try {
-          const result = await requestRoleChange(user.uid, newRole);
-          if (result.success) {
-              toast({ title: "Success", description: "Your role change request has been submitted." });
-              mutate(); // Re-fetch user session to show updated desiredRole
-          } else {
-              toast({ variant: "destructive", title: "Error", description: result.message });
-          }
-      } catch (error) {
-          toast({ variant: "destructive", title: "Error", description: "An unexpected error occurred." });
-      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "An unexpected error occurred.",
+      });
+    }
   };
 
-
   if (loading) {
-    return <div className="container mx-auto py-10 text-center">Loading profile...</div>;
+    return (
+      <div className="container mx-auto py-10 text-center">
+        Loading profile...
+      </div>
+    );
   }
 
   if (!user) {
-    // This can be a loading state or a redirect. useUser hook handles redirection.
+    // Redirect to login if not authenticated
+    useEffect(() => {
+      const timer = setTimeout(() => {
+        router.push("/login");
+      }, 100);
+      return () => clearTimeout(timer);
+    }, [router]);
     return (
-        <div className="container mx-auto py-10 text-center">
-            <p>You must be logged in to view this page.</p>
-            <Button onClick={() => router.push('/login')} className="mt-4">Go to Login</Button>
-        </div>
+      <div className="container mx-auto py-10 text-center">
+        Redirecting to login...
+      </div>
     );
   }
 
@@ -80,69 +117,83 @@ export default function ProfilePage() {
               <p>{user.email}</p>
             </div>
           </div>
-           <div>
+          <div>
             <h3 className="font-semibold">Current Role</h3>
             <p>{user.role}</p>
           </div>
-           <div>
+          <div>
             <h3 className="font-semibold">Verification Status</h3>
             {user.verified ? (
-                <p className="text-green-600">Verified</p>
+              <p className="text-green-600">Verified</p>
             ) : (
-                <div className='text-amber-600'>
-                    <p>Pending Verification.</p>
-                    {user.desiredRole && (
-                      <>
-                        <p className='text-sm opacity-80'>Your request for the '{user.desiredRole}' role is awaiting admin approval.</p>
-                        <p className='text-sm opacity-80'>Please wait for an administrator to verify your request.</p>
-                      </>
-                    )}
-                </div>
+              <div className="text-amber-600">
+                <p>Pending Verification.</p>
+                {user.desiredRole && (
+                  <>
+                    <p className="text-sm opacity-80">
+                      Your request for the '{user.desiredRole}' role is awaiting
+                      admin approval.
+                    </p>
+                    <p className="text-sm opacity-80">
+                      Please wait for an administrator to verify your request.
+                    </p>
+                  </>
+                )}
+              </div>
             )}
           </div>
 
-          {user.role === 'Customer' && (
-              <form onSubmit={handleRoleRequest}>
-                <Card className='bg-muted/50'>
-                    <CardHeader>
-                        <CardTitle className='text-xl'>Request Role Change</CardTitle>
-                        <CardDescription>Want to become a food donor or a volunteer? Request a role change here. An administrator will review your request.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                         <div className="space-y-2">
-                            <Label htmlFor="role">Request New Role</Label>
-                            <Select name="role" required>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select a new role to request" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Canteen / Event">Canteen / Event (Food Donor)</SelectItem>
-                                    <SelectItem value="NGO / Volunteer">NGO / Volunteer (Food Recipient)</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            {user.desiredRole && (
-                                <p className='text-sm text-muted-foreground pt-2'>
-                                    Current pending request: <span className='font-medium opacity-70'>{user.desiredRole}</span>
-                                </p>
-                            )}
-                        </div>
-                    </CardContent>
-                    <CardFooter>
-                        <Button type="submit" disabled={!!user.desiredRole}>
-                            {user.desiredRole ? 'Request Pending' : 'Submit Request'}
-                        </Button>
-                    </CardFooter>
-                </Card>
-              </form>
+          {user.role === "Customer" && (
+            <form onSubmit={handleRoleRequest}>
+              <Card className="bg-muted/50">
+                <CardHeader>
+                  <CardTitle className="text-xl">Request Role Change</CardTitle>
+                  <CardDescription>
+                    Want to become a food donor or a volunteer? Request a role
+                    change here. An administrator will review your request.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <Label htmlFor="role">Request New Role</Label>
+                    <Select name="role" required>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a new role to request" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Canteen / Event">
+                          Canteen / Event (Food Donor)
+                        </SelectItem>
+                        <SelectItem value="NGO / Volunteer">
+                          NGO / Volunteer (Food Recipient)
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {user.desiredRole && (
+                      <p className="text-sm text-muted-foreground pt-2">
+                        Current pending request:{" "}
+                        <span className="font-medium opacity-70">
+                          {user.desiredRole}
+                        </span>
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <Button type="submit" disabled={!!user.desiredRole}>
+                    {user.desiredRole ? "Request Pending" : "Submit Request"}
+                  </Button>
+                </CardFooter>
+              </Card>
+            </form>
           )}
-
         </CardContent>
         <CardFooter>
-            <form action={handleLogout} className="w-full">
-                <Button type="submit" className="w-full" variant="outline">
-                    Logout
-                </Button>
-            </form>
+          <form action={handleLogout} className="w-full">
+            <Button type="submit" className="w-full" variant="outline">
+              Logout
+            </Button>
+          </form>
         </CardFooter>
       </Card>
     </div>

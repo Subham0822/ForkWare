@@ -13,10 +13,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Suspense, useEffect, useActionState } from "react";
-import { signup, login } from "@/app/actions/auth";
+import { Suspense, useEffect, useActionState, useState } from "react";
+import { signup, login } from "@/app/actions/auth-supabase";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/hooks/use-user";
+import { Eye, EyeOff } from "lucide-react";
 
 function LoginPageContent() {
   const router = useRouter();
@@ -25,6 +26,8 @@ function LoginPageContent() {
   const isSignup = searchParams.get("signup") === "true";
   const { toast } = useToast();
   const { user, loading, mutate } = useUser();
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
 
   const [loginState, loginAction, isLoginPending] = useActionState(login, null);
   const [signupState, signupAction, isSignupPending] = useActionState(
@@ -35,7 +38,11 @@ function LoginPageContent() {
   useEffect(() => {
     // This effect handles redirection for already logged-in users.
     if (!loading && user) {
-      router.push("/profile");
+      // Add a small delay to prevent immediate redirects
+      const timer = setTimeout(() => {
+        router.push("/profile");
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [user, loading, router]);
 
@@ -45,8 +52,16 @@ function LoginPageContent() {
         title: "Login Successful",
         description: "Redirecting to your profile...",
       });
+      console.log("Login successful, calling mutate...");
       mutate(); // Re-fetch user session
-      router.push("/profile");
+
+      // Dispatch login event for other components to listen to
+      window.dispatchEvent(new Event("login"));
+
+      // Add a small delay before redirect to allow mutate to complete
+      setTimeout(() => {
+        router.push("/profile");
+      }, 200);
     } else if (loginState?.success === false) {
       toast({
         variant: "destructive",
@@ -88,9 +103,11 @@ function LoginPageContent() {
   const currentRole = getRoleName(role);
 
   if (loading) {
-    return <div className="container mx-auto py-10 text-center">Loading...</div>;
+    return (
+      <div className="container mx-auto py-10 text-center">Loading...</div>
+    );
   }
-  
+
   if (user) {
     return null; // Don't render the form if user is logged in and redirect is pending
   }
@@ -101,7 +118,9 @@ function LoginPageContent() {
         defaultValue={isSignup ? "signup" : "login"}
         className="w-full max-w-md"
         onValueChange={(value) =>
-          router.push(`/login?role=${role}${value === "signup" ? "&signup=true" : ""}`)
+          router.push(
+            `/login?role=${role}${value === "signup" ? "&signup=true" : ""}`
+          )
         }
       >
         <TabsList className="grid w-full grid-cols-2">
@@ -132,12 +151,26 @@ function LoginPageContent() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="password-login">Password</Label>
-                  <Input
-                    id="password-login"
-                    name="password"
-                    type="password"
-                    required
-                  />
+                  <div className="relative">
+                    <Input
+                      id="password-login"
+                      name="password"
+                      type={showLoginPassword ? "text" : "password"}
+                      required
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowLoginPassword(!showLoginPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground hover:text-foreground"
+                    >
+                      {showLoginPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
                 </div>
               </CardContent>
               <CardFooter>
@@ -185,17 +218,35 @@ function LoginPageContent() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="password-signup">Password</Label>
-                  <Input
-                    id="password-signup"
-                    name="password"
-                    type="password"
-                    required
-                  />
+                  <div className="relative">
+                    <Input
+                      id="password-signup"
+                      name="password"
+                      type={showSignupPassword ? "text" : "password"}
+                      required
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSignupPassword(!showSignupPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground hover:text-foreground"
+                    >
+                      {showSignupPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
                 </div>
                 <input type="hidden" name="role" value={currentRole} />
               </CardContent>
               <CardFooter>
-                <Button className="w-full" type="submit" disabled={isSignupPending}>
+                <Button
+                  className="w-full"
+                  type="submit"
+                  disabled={isSignupPending}
+                >
                   {isSignupPending ? "Creating Account..." : "Create Account"}
                 </Button>
               </CardFooter>
