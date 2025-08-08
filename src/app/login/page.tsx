@@ -21,29 +21,30 @@ import { useUser } from "@/hooks/use-user";
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const role = searchParams.get("role") || "ngo";
+  const role = searchParams.get("role") || "customer"; // Default to customer
   const isSignup = searchParams.get("signup") === "true";
   const { toast } = useToast();
-  const { user } = useUser();
+  const { user, loading } = useUser();
 
   const [loginState, loginAction, isLoginPending] = useActionState(login, null);
   const [signupState, signupAction, isSignupPending] = useActionState(signup, null);
 
   useEffect(() => {
-    if (user) {
+    // If user is logged in (and not loading), redirect to profile
+    if (!loading && user) {
       router.push('/profile');
     }
-  }, [user, router]);
+  }, [user, loading, router]);
   
   useEffect(() => {
-    if (loginState?.success === true) {
+    if (loginState?.success) {
       toast({
         title: "Login Successful",
         description: "Redirecting to your profile...",
       });
-      // The user object listener in the main layout will trigger the redirect.
+      // The user object listener will trigger the redirect.
       // Forcing it here can be unreliable if the auth state hasn't propagated yet.
-       router.push('/profile');
+      router.push('/profile');
     } else if (loginState?.success === false) {
       toast({
         variant: "destructive",
@@ -54,14 +55,15 @@ function LoginPageContent() {
   }, [loginState, router, toast]);
 
   useEffect(() => {
-    if (signupState?.success === true) {
+    if (signupState?.success) {
        toast({
         variant: "default",
         title: "Success",
         description: signupState.message,
       });
        if (signupState.success) {
-        router.push('/login?role=' + role);
+        // Switch to the login tab after successful signup
+        router.push(`/login?role=${role}`);
       }
     } else if (signupState?.success === false) {
         toast({

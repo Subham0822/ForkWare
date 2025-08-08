@@ -15,6 +15,7 @@ interface UserProfile {
 }
 
 const PROTECTED_ROUTES = ['/profile', '/admin', '/canteen', '/dashboard', '/analytics'];
+const PUBLIC_AUTH_ROUTE = '/login';
 
 export function useUser() {
   const router = useRouter();
@@ -25,9 +26,7 @@ export function useUser() {
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
-      setLoading(true);
       setUser(firebaseUser);
-
       if (firebaseUser) {
         // User is logged in, listen for profile changes
         const userDocRef = doc(db, 'users', firebaseUser.uid);
@@ -35,7 +34,6 @@ export function useUser() {
           if (doc.exists()) {
             setProfile(doc.data() as UserProfile);
           } else {
-            // This case might happen if a user is deleted from Firestore but not from Auth
             setProfile(null);
           }
           setLoading(false);
@@ -49,15 +47,28 @@ export function useUser() {
         // User is not logged in
         setProfile(null);
         setLoading(false);
-        // If the user is on a protected page, redirect them to login
-        if (PROTECTED_ROUTES.includes(pathname)) {
-          router.push('/login');
-        }
       }
     });
 
     return () => unsubscribeAuth();
-  }, [pathname, router]);
+  }, []); // Empty dependency array ensures this runs only once on mount
+
+  useEffect(() => {
+    // This effect handles redirection logic after loading is complete
+    if (!loading) {
+      const isProtectedRoute = PROTECTED_ROUTES.includes(pathname);
+      
+      if (!user && isProtectedRoute) {
+        // If user is not logged in and on a protected route, redirect to login
+        router.push(PUBLIC_AUTH_ROUTE);
+      }
+      
+      if (user && pathname === PUBLIC_AUTH_ROUTE) {
+        // If user is logged in and on the login page, redirect to profile
+        router.push('/profile');
+      }
+    }
+  }, [user, loading, pathname, router]);
 
   return { user, profile, loading };
 }

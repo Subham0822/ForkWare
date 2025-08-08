@@ -20,9 +20,8 @@ export default function ProfilePage() {
     return <div className="container mx-auto py-10 text-center">Loading profile...</div>;
   }
 
-  if (!user || !profile) {
-    // This state is hit if useUser hook redirects. It's a fallback.
-    // The hook should handle the redirect now.
+  if (!user) {
+     // useUser hook handles the redirect, this is a fallback.
     return (
         <div className="container mx-auto py-10 text-center">
             <p>You must be logged in to view this page.</p>
@@ -30,6 +29,11 @@ export default function ProfilePage() {
         </div>
     );
   }
+  
+  if (!profile) {
+      return <div className="container mx-auto py-10 text-center">Loading profile data... If this persists, the profile may not exist.</div>;
+  }
+
 
   return (
     <div className="container mx-auto py-10 px-4 md:px-6 flex items-center justify-center min-h-[calc(100vh-8rem)]">
