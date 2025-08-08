@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "@/components/theme-provider";
 import { PageLoader } from "@/components/page-loader";
 import { Suspense } from "react";
+import { DockNavigation } from "@/components/dock-navigation";
 
 export const metadata: Metadata = {
   title: "KindPlate",
