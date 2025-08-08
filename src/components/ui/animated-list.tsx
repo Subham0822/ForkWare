@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
-import { ReactNode } from "react";
+import React, { ReactNode } from "react";
 
 interface AnimatedListProps {
   className?: string;
