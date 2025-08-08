@@ -27,25 +27,26 @@ function LoginPageContent() {
   const { user, loading } = useUser();
 
   const [loginState, loginAction, isLoginPending] = useActionState(login, null);
-  const [signupState, signupAction, isSignupPending] = useActionState(signup, null);
+  const [signupState, signupAction, isSignupPending] = useActionState(
+    signup,
+    null
+  );
 
   useEffect(() => {
     // This effect handles redirection for already logged-in users.
     if (!loading && user) {
-      router.push('/profile');
+      router.push("/profile");
     }
   }, [user, loading, router]);
-  
+
   useEffect(() => {
     if (loginState?.success) {
       toast({
         title: "Login Successful",
         description: "Redirecting to your profile...",
       });
-      // We need to trigger a refresh or redirect to let the `useUser` hook
-      // pick up the new cookie session.
-      router.push('/profile');
-      router.refresh(); // Force a refresh to update layout and user state
+      // Redirect after successful login, useUser hook will handle the rest
+      router.push("/profile");
     } else if (loginState?.success === false) {
       toast({
         variant: "destructive",
@@ -57,42 +58,51 @@ function LoginPageContent() {
 
   useEffect(() => {
     if (signupState?.success) {
-       toast({
+      toast({
         variant: "default",
         title: "Success",
         description: signupState.message,
       });
-       if (signupState.success) {
+      if (signupState.success) {
         // Switch to the login tab after successful signup
         router.push(`/login?role=${role}`);
       }
     } else if (signupState?.success === false) {
-        toast({
-            variant: "destructive",
-            title: "Signup Failed",
-            description: signupState.message,
-        });
+      toast({
+        variant: "destructive",
+        title: "Signup Failed",
+        description: signupState.message,
+      });
     }
   }, [signupState, toast, role, router]);
 
-
   const getRoleName = (roleKey: string) => {
     const roles: { [key: string]: string } = {
-        canteen: "Canteen / Event",
-        ngo: "NGO / Volunteer",
-        customer: "Customer",
+      canteen: "Canteen / Event",
+      ngo: "NGO / Volunteer",
+      customer: "Customer",
     };
     return roles[roleKey] || "Customer";
   };
-  
+
   const currentRole = getRoleName(role);
+
+  if (loading) {
+    return <div className="container mx-auto py-10 text-center">Loading...</div>;
+  }
+  
+  if (user) {
+    return null; // Don't render the form if user is logged in and redirect is pending
+  }
 
   return (
     <div className="container mx-auto flex items-center justify-center min-h-[calc(100vh-8rem)] py-12">
       <Tabs
         defaultValue={isSignup ? "signup" : "login"}
         className="w-full max-w-md"
-        onValueChange={(value) => router.push(`/login?role=${role}${value === 'signup' ? '&signup=true' : ''}`)}
+        onValueChange={(value) =>
+          router.push(`/login?role=${role}${value === "signup" ? "&signup=true" : ""}`)
+        }
       >
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="login">Login</TabsTrigger>
@@ -122,11 +132,20 @@ function LoginPageContent() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="password-login">Password</Label>
-                  <Input id="password-login" name="password" type="password" required />
+                  <Input
+                    id="password-login"
+                    name="password"
+                    type="password"
+                    required
+                  />
                 </div>
               </CardContent>
               <CardFooter>
-                <Button className="w-full" type="submit" disabled={isLoginPending || loading}>
+                <Button
+                  className="w-full"
+                  type="submit"
+                  disabled={isLoginPending}
+                >
                   {isLoginPending ? "Logging in..." : "Login"}
                 </Button>
               </CardFooter>
@@ -145,7 +164,7 @@ function LoginPageContent() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                 <div className="space-y-2">
+                <div className="space-y-2">
                   <Label htmlFor="name-signup">Organization/Full Name</Label>
                   <Input
                     id="name-signup"
@@ -166,13 +185,18 @@ function LoginPageContent() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="password-signup">Password</Label>
-                  <Input id="password-signup" name="password" type="password" required />
+                  <Input
+                    id="password-signup"
+                    name="password"
+                    type="password"
+                    required
+                  />
                 </div>
-                 <input type="hidden" name="role" value={currentRole} />
+                <input type="hidden" name="role" value={currentRole} />
               </CardContent>
               <CardFooter>
-                <Button className="w-full" type="submit" disabled={isSignupPending || loading}>
-                    {isSignupPending ? "Creating Account..." : "Create Account"}
+                <Button className="w-full" type="submit" disabled={isSignupPending}>
+                  {isSignupPending ? "Creating Account..." : "Create Account"}
                 </Button>
               </CardFooter>
             </Card>

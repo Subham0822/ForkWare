@@ -17,7 +17,7 @@ export default function ProfilePage() {
 
   const handleLogout = async () => {
     await logout();
-    window.localStorage.setItem('logout-event', `logout-${Date.now()}`);
+    router.push('/login');
   };
 
   const handleRoleRequest = async (e: FormEvent<HTMLFormElement>) => {
@@ -36,8 +36,6 @@ export default function ProfilePage() {
           const result = await requestRoleChange(user.uid, newRole);
           if (result.success) {
               toast({ title: "Success", description: "Your role change request has been submitted." });
-              // Refresh the page to show the updated status
-              router.refresh();
           } else {
               toast({ variant: "destructive", title: "Error", description: result.message });
           }
@@ -52,6 +50,7 @@ export default function ProfilePage() {
   }
 
   if (!user || !profile) {
+    // This can be a loading state or a redirect. useUser hook handles redirection.
     return (
         <div className="container mx-auto py-10 text-center">
             <p>You must be logged in to view this page.</p>

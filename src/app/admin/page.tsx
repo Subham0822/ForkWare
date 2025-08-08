@@ -3,8 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import React, { useState, useEffect } from 'react';
-import { useActionState } from 'react';
+import React, { useState, useEffect, useActionState } from 'react';
 import { signup, updateUserRole } from '@/app/actions/auth';
 import { useToast } from "@/hooks/use-toast";
 
@@ -128,7 +127,7 @@ export default function AdminDashboard() {
   };
   
   const handleVerificationChange = async (userId: string, verified: boolean) => {
-    toast({ variant: "destructive", title: "Not Implemented", description: "Changing verification is not supported with CSV storage."});
+    toast({ variant: "destructive", title: "Not Implemented", description: "Changing verification status is handled via role updates."});
   };
 
   function onSurplusSubmit(data: SurplusFormValues) {
@@ -193,7 +192,7 @@ export default function AdminDashboard() {
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="font-headline">User Management</CardTitle>
-                <CardDescription>Note: User management is limited with CSV storage.</CardDescription>
+                <CardDescription>Approve role changes and manage users.</CardDescription>
               </div>
               <div className="flex items-center gap-2">
                  <Button variant="outline" size="sm" onClick={() => setIsAddUserDialogOpen(true)}>
@@ -279,7 +278,7 @@ export default function AdminDashboard() {
                 <DialogHeader>
                     <DialogTitle>Add New User</DialogTitle>
                     <DialogDescription>
-                        Create a new user account and assign them a role. The user will be saved to the local CSV file.
+                        Create a new user account and assign them a role.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
