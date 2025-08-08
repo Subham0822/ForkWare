@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from "next/link";
@@ -7,6 +6,7 @@ import { Button } from "./ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
 import { Menu, UserCircle } from "lucide-react";
 import { useUser } from "@/hooks/use-user";
+import { ThemeToggle } from "./theme-toggle";
 
 export function Header() {
   const { user, profile } = useUser();
@@ -45,76 +45,79 @@ export function Header() {
             </Link>
            )}
         </nav>
-        <div className="hidden md:flex items-center gap-2">
-          {user ? (
-            <Button variant="ghost" asChild>
-              <Link href="/profile" className="flex items-center gap-2">
-                <UserCircle />
-                My Profile
-              </Link>
-            </Button>
-          ) : (
-            <>
-              <Button variant="outline" asChild>
-                <Link href="/login">Login</Link>
-              </Button>
-              <Button asChild>
-                <Link href="/login?signup=true">Sign Up</Link>
-              </Button>
-            </>
-          )}
-        </div>
-        <div className="md:hidden">
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Menu className="h-6 w-6" />
-                <span className="sr-only">Toggle navigation menu</span>
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right">
-              <div className="flex flex-col gap-6 p-6">
-                <Link href="/">
-                  <KindPlateLogo />
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <div className="hidden md:flex items-center gap-2">
+            {user ? (
+              <Button variant="ghost" asChild>
+                <Link href="/profile" className="flex items-center gap-2">
+                  <UserCircle />
+                  My Profile
                 </Link>
-                <nav className="flex flex-col gap-4">
-                  {navItems.map((item) => (
-                    <Link
-                      key={item.label}
-                      href={item.href}
-                      className="text-lg font-medium"
-                    >
-                      {item.label}
-                    </Link>
-                  ))}
-                  {profile?.role === 'Admin' && (
-                     <Link
-                      href={adminNav.href}
-                      className="text-lg font-medium"
-                    >
-                      {adminNav.label}
-                    </Link>
-                  )}
-                </nav>
-                <div className="mt-auto flex flex-col gap-2 border-t pt-6">
-                   {user ? (
-                    <Button variant="outline" asChild>
-                       <Link href="/profile">View Profile</Link>
-                    </Button>
-                  ) : (
-                    <>
+              </Button>
+            ) : (
+              <>
+                <Button variant="outline" asChild>
+                  <Link href="/login">Login</Link>
+                </Button>
+                <Button asChild>
+                  <Link href="/login?signup=true">Sign Up</Link>
+                </Button>
+              </>
+            )}
+          </div>
+          <div className="md:hidden">
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Menu className="h-6 w-6" />
+                  <span className="sr-only">Toggle navigation menu</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right">
+                <div className="flex flex-col gap-6 p-6">
+                  <Link href="/">
+                    <KindPlateLogo />
+                  </Link>
+                  <nav className="flex flex-col gap-4">
+                    {navItems.map((item) => (
+                      <Link
+                        key={item.label}
+                        href={item.href}
+                        className="text-lg font-medium"
+                      >
+                        {item.label}
+                      </Link>
+                    ))}
+                    {profile?.role === 'Admin' && (
+                       <Link
+                        href={adminNav.href}
+                        className="text-lg font-medium"
+                      >
+                        {adminNav.label}
+                      </Link>
+                    )}
+                  </nav>
+                  <div className="mt-auto flex flex-col gap-2 border-t pt-6">
+                     {user ? (
                       <Button variant="outline" asChild>
-                        <Link href="/login">Login</Link>
+                         <Link href="/profile">View Profile</Link>
                       </Button>
-                      <Button asChild>
-                        <Link href="/login?signup=true">Sign Up</Link>
-                      </Button>
-                    </>
-                  )}
+                    ) : (
+                      <>
+                        <Button variant="outline" asChild>
+                          <Link href="/login">Login</Link>
+                        </Button>
+                        <Button asChild>
+                          <Link href="/login?signup=true">Sign Up</Link>
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </SheetContent>
-          </Sheet>
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
       </div>
     </header>

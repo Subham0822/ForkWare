@@ -6,7 +6,7 @@ import Link from "next/link";
 
 export default function Home() {
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col animate-fade-in-up">
       <section className="container mx-auto px-4 md:px-6 py-20 md:py-32">
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div className="space-y-6 text-center md:text-left">
@@ -21,10 +21,10 @@ export default function Home() {
               and safely.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
-              <Button size="lg" asChild>
+              <Button size="lg" asChild className="transition-transform hover:scale-105">
                 <Link href="/login?role=canteen">Canteen / Event Login</Link>
               </Button>
-              <Button size="lg" variant="outline" asChild>
+              <Button size="lg" variant="outline" asChild className="transition-transform hover:scale-105">
                 <Link href="/login?role=ngo">NGO / Volunteer Login</Link>
               </Button>
             </div>
@@ -34,7 +34,7 @@ export default function Home() {
               src="https://placehold.co/600x400.png"
               alt="Community sharing food"
               fill
-              className="rounded-lg object-cover shadow-xl"
+              className="rounded-lg object-cover shadow-xl transform transition-all duration-500 hover:scale-105"
               data-ai-hint="community food sharing"
             />
           </div>
@@ -53,7 +53,7 @@ export default function Home() {
             </p>
           </div>
           <div className="grid md:grid-cols-3 gap-8">
-            <Card className="text-center shadow-lg">
+            <Card className="text-center shadow-lg transition-transform duration-300 hover:scale-105 hover:shadow-2xl">
               <CardHeader>
                 <div className="mx-auto bg-primary/10 rounded-full p-4 w-fit">
                   <Utensils className="h-8 w-8 text-primary" />
@@ -69,7 +69,7 @@ export default function Home() {
                 </p>
               </CardContent>
             </Card>
-            <Card className="text-center shadow-lg">
+            <Card className="text-center shadow-lg transition-transform duration-300 hover:scale-105 hover:shadow-2xl">
               <CardHeader>
                 <div className="mx-auto bg-primary/10 rounded-full p-4 w-fit">
                   <Bell className="h-8 w-8 text-primary" />
@@ -85,7 +85,7 @@ export default function Home() {
                 </p>
               </CardContent>
             </Card>
-            <Card className="text-center shadow-lg">
+            <Card className="text-center shadow-lg transition-transform duration-300 hover:scale-105 hover:shadow-2xl">
               <CardHeader>
                 <div className="mx-auto bg-primary/10 rounded-full p-4 w-fit">
                   <BarChart className="h-8 w-8 text-primary" />
