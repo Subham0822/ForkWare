@@ -14,7 +14,7 @@ interface UserProfile {
   verified: boolean;
 }
 
-const PROTECTED_ROUTES = ['/profile', '/admin', '/canteen', '/dashboard', '/analytics'];
+const PROTECTED_ROUTES = ['/profile', '/admin'];
 const PUBLIC_AUTH_ROUTE = '/login';
 
 export function useUser() {
