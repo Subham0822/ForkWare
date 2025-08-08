@@ -10,7 +10,7 @@ export async function GET() {
     return NextResponse.json({ message: result.message }, { status: 500 });
 
   } catch (error) {
-    console.error('Failed to fetch users from Firestore:', error);
+    console.error('Failed to fetch users from CSV:', error);
     return NextResponse.json({ message: 'Failed to fetch users.' }, { status: 500 });
   }
 }

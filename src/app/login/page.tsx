@@ -24,7 +24,7 @@ function LoginPageContent() {
   const role = searchParams.get("role") || "customer"; // Default to customer
   const isSignup = searchParams.get("signup") === "true";
   const { toast } = useToast();
-  const { user, loading } = useUser();
+  const { user, loading, mutate } = useUser();
 
   const [loginState, loginAction, isLoginPending] = useActionState(login, null);
   const [signupState, signupAction, isSignupPending] = useActionState(
@@ -45,7 +45,7 @@ function LoginPageContent() {
         title: "Login Successful",
         description: "Redirecting to your profile...",
       });
-      // Redirect after successful login, useUser hook will handle the rest
+      mutate(); // Re-fetch user session
       router.push("/profile");
     } else if (loginState?.success === false) {
       toast({
@@ -54,7 +54,7 @@ function LoginPageContent() {
         description: loginState.message,
       });
     }
-  }, [loginState, router, toast]);
+  }, [loginState, router, toast, mutate]);
 
   useEffect(() => {
     if (signupState?.success) {

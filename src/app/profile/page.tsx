@@ -12,11 +12,12 @@ import { FormEvent } from 'react';
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user, profile, loading } = useUser();
+  const { user, loading, mutate } = useUser();
   const { toast } = useToast();
 
   const handleLogout = async () => {
     await logout();
+    mutate(); // Trigger re-fetch of session
     router.push('/login');
   };
 
@@ -36,6 +37,7 @@ export default function ProfilePage() {
           const result = await requestRoleChange(user.uid, newRole);
           if (result.success) {
               toast({ title: "Success", description: "Your role change request has been submitted." });
+              mutate(); // Re-fetch user session to show updated desiredRole
           } else {
               toast({ variant: "destructive", title: "Error", description: result.message });
           }
@@ -49,7 +51,7 @@ export default function ProfilePage() {
     return <div className="container mx-auto py-10 text-center">Loading profile...</div>;
   }
 
-  if (!user || !profile) {
+  if (!user) {
     // This can be a loading state or a redirect. useUser hook handles redirection.
     return (
         <div className="container mx-auto py-10 text-center">
@@ -70,30 +72,30 @@ export default function ProfilePage() {
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <h3 className="font-semibold">Name</h3>
-              <p>{profile.name}</p>
+              <p>{user.name}</p>
             </div>
             <div>
               <h3 className="font-semibold">Email</h3>
-              <p>{profile.email}</p>
+              <p>{user.email}</p>
             </div>
           </div>
            <div>
             <h3 className="font-semibold">Current Role</h3>
-            <p>{profile.role}</p>
+            <p>{user.role}</p>
           </div>
            <div>
             <h3 className="font-semibold">Verification Status</h3>
-            {profile.verified ? (
+            {user.verified ? (
                 <p className="text-green-600">Verified</p>
             ) : (
                 <div className='text-amber-600'>
                     <p>Pending Verification.</p>
-                    {profile.desiredRole && <p className='text-sm opacity-80'>Your request for the '{profile.desiredRole}' role is awaiting admin approval.</p>}
+                    {user.desiredRole && <p className='text-sm opacity-80'>Your request for the '{user.desiredRole}' role is awaiting admin approval.</p>}
                 </div>
             )}
           </div>
 
-          {profile.role === 'Customer' && (
+          {user.role === 'Customer' && (
               <form onSubmit={handleRoleRequest}>
                 <Card className='bg-muted/50'>
                     <CardHeader>
@@ -112,16 +114,16 @@ export default function ProfilePage() {
                                     <SelectItem value="NGO / Volunteer">NGO / Volunteer (Food Recipient)</SelectItem>
                                 </SelectContent>
                             </Select>
-                            {profile.desiredRole && (
+                            {user.desiredRole && (
                                 <p className='text-sm text-muted-foreground pt-2'>
-                                    Current pending request: <span className='font-medium opacity-70'>{profile.desiredRole}</span>
+                                    Current pending request: <span className='font-medium opacity-70'>{user.desiredRole}</span>
                                 </p>
                             )}
                         </div>
                     </CardContent>
                     <CardFooter>
-                        <Button type="submit" disabled={!!profile.desiredRole}>
-                            {profile.desiredRole ? 'Request Pending' : 'Submit Request'}
+                        <Button type="submit" disabled={!!user.desiredRole}>
+                            {user.desiredRole ? 'Request Pending' : 'Submit Request'}
                         </Button>
                     </CardFooter>
                 </Card>

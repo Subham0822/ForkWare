@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { onAuthStateChanged, type User } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { useEffect, useState, useCallback } from 'react';
+import { getSession } from '@/app/actions/auth';
 import { usePathname, useRouter } from 'next/navigation';
+import { jwtDecode } from 'jwt-decode';
 
 interface UserProfile {
   uid: string;
@@ -15,49 +14,44 @@ interface UserProfile {
   desiredRole?: string;
 }
 
+interface UserPayload {
+    user: UserProfile;
+    iat: number;
+    exp: number;
+}
+
+
 const PROTECTED_ROUTES = ['/profile', '/admin', '/canteen', '/dashboard', '/analytics'];
 const PUBLIC_AUTH_ROUTE = '/login';
 
 export function useUser() {
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
-      if (authUser) {
-        setUser(authUser);
-        // User is signed in, see docs for a list of available properties
-        // https://firebase.google.com/docs/reference/js/firebase.User
-      } else {
-        // User is signed out
+  const fetchUser = useCallback(async () => {
+    setLoading(true);
+    try {
+        const session = await getSession();
+        if (session && session.user) {
+            setUser(session.user as UserProfile);
+        } else {
+            setUser(null);
+        }
+    } catch (error) {
+        console.error("Session fetch error:", error);
         setUser(null);
-        setProfile(null);
-      }
-      setLoading(false);
-    });
-
-    // Cleanup subscription on unmount
-    return () => unsubscribe();
+    } finally {
+        setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    if (user?.uid) {
-        const unsub = onSnapshot(doc(db, "users", user.uid), (doc) => {
-            if (doc.exists()) {
-                setProfile(doc.data() as UserProfile);
-            } else {
-                setProfile(null);
-            }
-        });
-        return () => unsub();
-    }
-  }, [user]);
+    fetchUser();
+  }, [fetchUser]);
 
-   useEffect(() => {
-    // This effect handles redirection logic after the session check is complete.
+  useEffect(() => {
     if (!loading) {
       const isProtectedRoute = PROTECTED_ROUTES.some(route => pathname.startsWith(route));
       if (!user && isProtectedRoute) {
@@ -66,5 +60,5 @@ export function useUser() {
     }
   }, [user, loading, pathname, router]);
 
-  return { user, profile, loading };
+  return { user, loading, mutate: fetchUser };
 }

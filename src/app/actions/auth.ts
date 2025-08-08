@@ -1,23 +1,48 @@
+
 'use server';
 
-import { auth, db } from '@/lib/firebase';
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-} from 'firebase/auth';
-import {
-  doc,
-  setDoc,
-  getDoc,
-  updateDoc,
-  collection,
-  getDocs,
-  query,
-} from 'firebase/firestore';
+import fs from 'fs/promises';
+import path from 'path';
+import { SignJWT, jwtVerify } from 'jose';
+import { cookies } from 'next/headers';
 
-// Note: We are not implementing server-side session management for this example.
-// In a production app, you would use session cookies or other mechanisms.
+const secretKey = process.env.SESSION_SECRET || 'your-fallback-secret-key';
+const key = new TextEncoder().encode(secretKey);
+
+const csvFilePath = path.join(process.cwd(), 'data', 'users.csv');
+
+// Helper to read users from CSV
+async function readUsers() {
+  try {
+    const data = await fs.readFile(csvFilePath, 'utf-8');
+    const lines = data.trim().split('\n');
+    const headers = lines[0].split(',');
+    return lines.slice(1).map(line => {
+      const values = line.split(',');
+      return headers.reduce((obj, header, index) => {
+        obj[header.trim()] = values[index].trim();
+        return obj;
+      }, {} as any);
+    });
+  } catch (error) {
+    // If file doesn't exist, return empty array
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return [];
+    }
+    throw error;
+  }
+}
+
+// Helper to write users to CSV
+async function writeUsers(users: any[]) {
+  const headers = ['uid', 'name', 'email', 'password', 'role', 'verified', 'desiredRole'];
+  const csvLines = [
+    headers.join(','),
+    ...users.map(user => headers.map(header => user[header] ?? '').join(','))
+  ];
+  await fs.mkdir(path.dirname(csvFilePath), { recursive: true });
+  await fs.writeFile(csvFilePath, csvLines.join('\n'), 'utf-8');
+}
 
 export async function signup(prevState: any, formData: FormData) {
   const name = formData.get('name') as string;
@@ -26,134 +51,118 @@ export async function signup(prevState: any, formData: FormData) {
   const role = formData.get('role') as string;
 
   if (password.length < 6) {
-    return {
-      success: false,
-      message: 'Password must be at least 6 characters long.',
-    };
+    return { success: false, message: 'Password must be at least 6 characters long.' };
   }
 
-  try {
-    const userCredential = await createUserWithEmailAndPassword(
-      auth,
-      email,
-      password
-    );
-    const user = userCredential.user;
-
-    // Create a user profile in Firestore
-    await setDoc(doc(db, 'users', user.uid), {
-      uid: user.uid,
-      name,
-      email,
-      role,
-      verified: role === 'Customer', // Customers are auto-verified
-      desiredRole: '',
-    });
-
-    return { success: true, message: 'Account created successfully! Please login.' };
-  } catch (error: any) {
-    // Basic error handling
-    if (error.code === 'auth/email-already-in-use') {
-      return { success: false, message: 'This email address is already in use.' };
-    }
-    return {
-      success: false,
-      message: 'An unexpected error occurred during signup.',
-    };
+  const users = await readUsers();
+  if (users.some(u => u.email === email)) {
+    return { success: false, message: 'This email address is already in use.' };
   }
+
+  const newUser = {
+    uid: Date.now().toString(),
+    name,
+    email,
+    password, // In a real app, hash this!
+    role,
+    verified: role === 'Customer',
+    desiredRole: '',
+  };
+
+  await writeUsers([...users, newUser]);
+
+  return { success: true, message: 'Account created successfully! Please login.' };
 }
 
 export async function login(prevState: any, formData: FormData) {
   const email = formData.get('email') as string;
   const password = formData.get('password') as string;
 
-  try {
-    await signInWithEmailAndPassword(auth, email, password);
-    return { success: true, message: 'Login successful!' };
-  } catch (error: any) {
-    if (
-      error.code === 'auth/user-not-found' ||
-      error.code === 'auth/wrong-password' ||
-      error.code === 'auth/invalid-credential'
-    ) {
-      return {
-        success: false,
-        message: 'Invalid email or password. Please try again.',
-      };
-    }
-    return {
-      success: false,
-      message: 'An unexpected error occurred during login.',
-    };
+  const users = await readUsers();
+  const user = users.find(u => u.email === email && u.password === password);
+
+  if (!user) {
+    return { success: false, message: 'Invalid email or password.' };
   }
+
+  const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+  const session = await new SignJWT({ user })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setExpirationTime(expires)
+    .sign(key);
+  
+  cookies().set('session', session, { expires, httpOnly: true });
+
+  return { success: true, message: 'Login successful!' };
 }
 
-// This function is intended to be called from a client-side context where auth state is managed
 export async function logout() {
+  cookies().set('session', '', { expires: new Date(0) });
+  return { success: true, message: 'Logged out successfully.' };
+}
+
+export async function getSession() {
+  const session = cookies().get('session')?.value;
+  if (!session) return null;
   try {
-    await signOut(auth);
-    return { success: true, message: 'Logged out successfully.' };
-  } catch (error: any) {
-    return {
-      success: false,
-      message: 'An error occurred during logout.',
-    };
+    const { payload } = await jwtVerify(session, key, { algorithms: ['HS256'] });
+    return payload;
+  } catch (error) {
+    return null;
   }
 }
 
-export async function getUserProfile(uid: string) {
-  try {
-    const userDocRef = doc(db, 'users', uid);
-    const userDoc = await getDoc(userDocRef);
-
-    if (userDoc.exists()) {
-      return { success: true, data: userDoc.data() };
-    } else {
-      return { success: false, message: 'User profile not found.' };
-    }
-  } catch (error) {
-    return {
-      success: false,
-      message: 'Failed to fetch user profile.',
-    };
+export async function updateUser(updatedUser: any) {
+  let users = await readUsers();
+  const index = users.findIndex(u => u.uid === updatedUser.uid);
+  if (index !== -1) {
+    users[index] = { ...users[index], ...updatedUser };
+    await writeUsers(users);
+    return { success: true };
   }
+  return { success: false, message: "User not found" };
 }
 
 
 export async function requestRoleChange(userId: string, newRole: string) {
-    try {
-        const userDocRef = doc(db, "users", userId);
-        await updateDoc(userDocRef, {
-            desiredRole: newRole,
-        });
-        return { success: true, message: "Role change requested successfully!" };
-    } catch (error) {
-        return { success: false, message: "An unexpected error occurred." };
+    let users = await readUsers();
+    const user = users.find(u => u.uid === userId);
+
+    if (!user) {
+        return { success: false, message: "User not found." };
     }
+
+    user.desiredRole = newRole;
+    await writeUsers(users);
+    return { success: true, message: "Role change requested successfully!" };
 }
 
 export async function updateUserRole(userId: string, newRole: string) {
-    try {
-        const userDocRef = doc(db, "users", userId);
-        await updateDoc(userDocRef, {
-            role: newRole,
-            verified: true, // Approve and verify
-            desiredRole: "", // Clear the request
-        });
-        return { success: true, message: "User role updated successfully!" };
-    } catch (error) {
-        return { success: false, message: "An unexpected error occurred." };
+    let users = await readUsers();
+    const user = users.find(u => u.uid === userId);
+
+    if (!user) {
+        return { success: false, message: "User not found." };
     }
+    
+    user.role = newRole;
+    user.verified = true; // Approve and verify
+    user.desiredRole = ""; // Clear the request
+    await writeUsers(users);
+    return { success: true, message: "User role updated successfully!" };
 }
 
 export async function getAllUsers() {
   try {
-    const usersCollection = collection(db, 'users');
-    const usersSnapshot = await getDocs(query(usersCollection));
-    const usersList = usersSnapshot.docs.map(doc => doc.data());
-    return { success: true, data: usersList };
+    const users = await readUsers();
+    // Remove password from the user data sent to the client
+    const safeUsers = users.map(user => {
+      const { password, ...safeUser } = user;
+      return safeUser;
+    });
+    return { success: true, data: safeUsers };
   } catch (error) {
-    console.error("Error fetching users from Firestore: ", error);
+    console.error("Error reading users.csv: ", error);
     return { success: false, message: "Failed to fetch users." };
   }
 }

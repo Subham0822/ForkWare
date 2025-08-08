@@ -255,7 +255,7 @@ export default function AdminDashboard() {
                           <div className="flex items-center justify-center space-x-2">
                             <Switch
                               id={`verified-switch-${user.uid}`}
-                              checked={user.verified}
+                              checked={!!user.verified}
                               onCheckedChange={(checked) => handleVerificationChange(user.uid, checked)}
                               aria-readonly
                             />
