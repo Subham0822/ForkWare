@@ -28,8 +28,8 @@ export default function CanteenPage() {
     <div className="container mx-auto py-10 px-4 md:px-6">
         <Card>
         <CardHeader>
-            <CardTitle className="font-headline">Available Food Postings</CardTitle>
-            <CardDescription>Current surplus food listings from canteens and events.</CardDescription>
+            <CardTitle className="font-headline">My Food Postings</CardTitle>
+            <CardDescription>Manage your current surplus food listings.</CardDescription>
         </CardHeader>
         <CardContent>
             <Table>

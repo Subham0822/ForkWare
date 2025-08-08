@@ -1,10 +1,11 @@
 import { Button } from "@/components/ui/button";
-import { Utensils, Bell, BarChart } from "lucide-react";
+import { Utensils, Bell, BarChart2 as BarChart } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { TypeAnimation } from "@/components/ui/type-animation";
 import { BentoCard, BentoGrid } from "@/components/ui/bento-grid";
 import { MagicCard } from "@/components/ui/magic-card";
+import { Particles } from "@/components/ui/particles";
 
 const features = [
   {
@@ -36,7 +37,8 @@ const features = [
 export default function Home() {
   return (
     <div className="flex flex-col animate-fade-in-up">
-      <section className="container mx-auto px-4 md:px-6 py-20 md:py-32">
+      <section className="relative container mx-auto px-4 md:px-6 py-20 md:py-32">
+        <Particles className="absolute inset-0" quantity={100} ease={80} />
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div className="space-y-6 text-center md:text-left">
             <TypeAnimation
