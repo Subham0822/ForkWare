@@ -4,7 +4,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import React, { useState, useEffect, useActionState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useActionState } from 'react';
 import { signup } from '@/app/actions/auth';
 import { useToast } from "@/hooks/use-toast";
 
@@ -278,7 +279,7 @@ export default function AdminDashboard() {
                     <FormField control={addUserForm.control} name="role" render={({ field }) => (
                         <FormItem>
                             <FormLabel>Role</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <Select onValueChange={field.onChange} defaultValue={field.value} name="role">
                                 <FormControl>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select a role" />
@@ -309,4 +310,5 @@ export default function AdminDashboard() {
       </Dialog>
     </div>
   );
-}
+
+    
