@@ -3,7 +3,6 @@
 import { auth, db } from '@/lib/firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
-import { redirect } from 'next/navigation';
 
 export async function signup(prevState: any, formData: FormData) {
   const name = formData.get('name') as string;
@@ -39,9 +38,20 @@ export async function login(prevState: any, formData: FormData) {
         await signInWithEmailAndPassword(auth, email, password);
         return { success: true, message: 'Login successful!' };
     } catch (error: any) {
-        let errorMessage = 'Invalid login credentials. Please try again.';
-        if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
-             errorMessage = 'Invalid email or password.';
+        let errorMessage = 'An unexpected error occurred. Please try again.';
+        if (error.code) {
+            switch (error.code) {
+                case 'auth/user-not-found':
+                case 'auth/wrong-password':
+                case 'auth/invalid-credential':
+                    errorMessage = 'Invalid email or password.';
+                    break;
+                case 'auth/invalid-email':
+                    errorMessage = 'Please enter a valid email address.';
+                    break;
+                default:
+                    errorMessage = 'Invalid login credentials. Please try again.';
+            }
         } else if (error.message) {
             errorMessage = error.message;
         }
