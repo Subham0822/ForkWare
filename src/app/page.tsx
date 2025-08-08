@@ -1,8 +1,37 @@
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Utensils, Bell, BarChart } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { TypeAnimation } from "@/components/ui/type-animation";
+import { BentoCard, BentoGrid } from "@/components/ui/bento-grid";
+import { MagicCard } from "@/components/ui/magic-card";
+
+const features = [
+  {
+    Icon: Utensils,
+    name: "1. List Surplus",
+    description: "Canteens and event organizers post details about their surplus food in seconds.",
+    href: "/",
+    cta: "Learn more",
+    className: "col-span-3 lg:col-span-1",
+  },
+  {
+    Icon: Bell,
+    name: "2. Notify Volunteers",
+    description: "Nearby NGOs and volunteers are instantly notified about available food donations.",
+    href: "/",
+    cta: "Learn more",
+    className: "col-span-3 lg:col-span-1",
+  },
+  {
+    Icon: BarChart,
+    name: "3. Pickup & Track Impact",
+    description: "Volunteers claim and pick up the food, and the platform tracks the positive impact.",
+    href: "/",
+    cta: "Learn more",
+    className: "col-span-3 lg:col-span-1",
+  },
+];
 
 export default function Home() {
   return (
@@ -10,11 +39,10 @@ export default function Home() {
       <section className="container mx-auto px-4 md:px-6 py-20 md:py-32">
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div className="space-y-6 text-center md:text-left">
-            <h1 className="text-4xl md:text-6xl font-headline font-bold tracking-tighter">
-              Cut food waste.
-              <br />
-              <span className="text-primary">Feed the community.</span>
-            </h1>
+            <TypeAnimation
+              text="Cut food waste. Feed the community."
+              className="text-4xl md:text-6xl font-headline font-bold tracking-tighter"
+            />
             <p className="text-lg text-muted-foreground max-w-lg mx-auto md:mx-0">
               KindPlate connects campus canteens and event organizers with
               nearby volunteers and NGOs to redistribute surplus meals quickly
@@ -52,56 +80,30 @@ export default function Home() {
               need it most.
             </p>
           </div>
-          <div className="grid md:grid-cols-3 gap-8">
-            <Card className="text-center shadow-lg transition-transform duration-300 hover:scale-105 hover:shadow-2xl">
-              <CardHeader>
-                <div className="mx-auto bg-primary/10 rounded-full p-4 w-fit">
-                  <Utensils className="h-8 w-8 text-primary" />
-                </div>
-                <CardTitle className="font-headline mt-4">
-                  1. List Surplus
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  Canteens and event organizers post details about their
-                  surplus food in seconds.
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="text-center shadow-lg transition-transform duration-300 hover:scale-105 hover:shadow-2xl">
-              <CardHeader>
-                <div className="mx-auto bg-primary/10 rounded-full p-4 w-fit">
-                  <Bell className="h-8 w-8 text-primary" />
-                </div>
-                <CardTitle className="font-headline mt-4">
-                  2. Notify Volunteers
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  Nearby NGOs and volunteers are instantly notified about
-                  available food donations.
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="text-center shadow-lg transition-transform duration-300 hover:scale-105 hover:shadow-2xl">
-              <CardHeader>
-                <div className="mx-auto bg-primary/10 rounded-full p-4 w-fit">
-                  <BarChart className="h-8 w-8 text-primary" />
-                </div>
-                <CardTitle className="font-headline mt-4">
-                  3. Pickup & Track Impact
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  Volunteers claim and pick up the food, and the platform
-                  tracks the positive impact.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
+          <MagicCard
+            gradientColor="hsl(var(--primary))"
+            className="w-full"
+          >
+            <BentoGrid className="lg:grid-rows-1">
+              {features.map((feature) => (
+                <BentoCard key={feature.name} {...feature}>
+                  <div className="flex h-full flex-col gap-4 p-4">
+                    <div className="mx-auto bg-primary/10 rounded-full p-4 w-fit">
+                      <feature.Icon className="h-8 w-8 text-primary" />
+                    </div>
+                    <div className="flex flex-col gap-1.5 text-center">
+                      <h3 className="font-headline text-xl font-semibold">
+                        {feature.name}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {feature.description}
+                      </p>
+                    </div>
+                  </div>
+                </BentoCard>
+              ))}
+            </BentoGrid>
+          </MagicCard>
         </div>
       </section>
     </div>

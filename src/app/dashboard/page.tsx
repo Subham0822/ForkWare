@@ -10,6 +10,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
 import { Clock, MapPin } from "lucide-react";
+import { AnimatedList } from "@/components/ui/animated-list";
 
 const mockListings = [
   {
@@ -62,7 +63,7 @@ export default function NGODashboard() {
           in real-time.
         </p>
       </div>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <AnimatedList className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {mockListings.map((item) => (
           <Card
             key={item.id}
@@ -99,7 +100,7 @@ export default function NGODashboard() {
             </CardFooter>
           </Card>
         ))}
-      </div>
+      </AnimatedList>
     </div>
   );
 }
