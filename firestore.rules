@@ -1,0 +1,25 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users Collection Rules
+    match /users/{userId} {
+      // Allow users to read their own document
+      allow read: if request.auth != null && request.auth.uid == userId;
+      
+      // Allow users to create their own document upon signup
+      allow create: if request.auth != null && request.auth.uid == userId;
+
+      // Allow users to update their own document
+      allow update: if request.auth != null && request.auth.uid == userId;
+      
+      // Deny deletion of user documents
+      allow delete: if false;
+    }
+    
+    // Fallback rule for any other collection (currently locked down)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
