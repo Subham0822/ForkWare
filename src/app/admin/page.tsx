@@ -75,15 +75,9 @@ export default function AdminDashboard() {
   const fetchUsers = async () => {
     setIsLoading(true);
     try {
-      console.log('Fetching users from /api/users...');
       const response = await fetch('/api/users');
-      console.log('API response:', response);
       const data = await response.json();
-      console.log('API response data:', data, 'Type:', typeof data, 'Is Array:', Array.isArray(data));
       setUsers(data);
-      // Log individual user objects to inspect email property
-      console.log('Individual user data after fetch:');
-      data.forEach((user: any) => console.log('User:', user, 'Email Type:', typeof user.email));
     } catch (error) {
       console.error("Failed to fetch users:", error);
       toast({ variant: "destructive", title: "Error", description: "Failed to fetch users." });
@@ -116,14 +110,14 @@ export default function AdminDashboard() {
 
 
   const handleRoleChange = async (userId: string, newRole: string) => {
- try {
- const result = await updateUserRole(userId, newRole);
- if (result.success) {
- toast({ title: "Success", description: result.message });
- await fetchUsers(); // Refresh the user list after successful update
- } else {
- toast({ variant: "destructive", title: "Error", description: result.message });
- }
+    try {
+      const result = await updateUserRole(userId, newRole);
+      if (result.success) {
+        toast({ title: "Success", description: result.message });
+        await fetchUsers(); // Refresh the user list after successful update
+      } else {
+        toast({ variant: "destructive", title: "Error", description: result.message });
+      }
     } catch (error) {
       console.error("Failed to update user role:", error);
       toast({ variant: "destructive", title: "Error", description: "An unexpected error occurred." });
@@ -223,31 +217,32 @@ export default function AdminDashboard() {
                 </TableHeader>
                 <TableBody>
                     {users.map((user) => (
-                       <TableRow key={(user || {}).uid}>
- <TableCell className="font-medium">{user.email}</TableCell> {/* Ensure user.email is displayed here */}                      <TableCell>
-                            <Select defaultValue={user.role} onValueChange={(newRole) => handleRoleChange(user.uid, newRole)}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select role" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Admin">Admin</SelectItem>
-                                    <SelectItem value="Canteen / Event">Canteen / Event</SelectItem>
-                                    <SelectItem value="NGO / Volunteer">NGO / Volunteer</SelectItem>
-                                    <SelectItem value="Customer">Customer</SelectItem>
-                                </SelectContent>
-                            </Select>
+                      <TableRow key={user.uid}>
+                        <TableCell className="font-medium">{user.email}</TableCell>
+                        <TableCell>
+                          <Select defaultValue={user.role} onValueChange={(newRole) => handleRoleChange(user.uid, newRole)}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select role" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Admin">Admin</SelectItem>
+                              <SelectItem value="Canteen / Event">Canteen / Event</SelectItem>
+                              <SelectItem value="NGO / Volunteer">NGO / Volunteer</SelectItem>
+                              <SelectItem value="Customer">Customer</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </TableCell>
-                         <TableCell className="text-center">
-                            <div className="flex items-center justify-center space-x-2">
-                                <Switch
-                                    id={`verified-switch-${user.uid}`}
-                                    checked={user.verified}
-                                    onCheckedChange={(checked) => handleVerificationChange(user.uid, checked)}
-                                    aria-readonly
-                                />
-                            </div>
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center space-x-2">
+                            <Switch
+                              id={`verified-switch-${user.uid}`}
+                              checked={user.verified}
+                              onCheckedChange={(checked) => handleVerificationChange(user.uid, checked)}
+                              aria-readonly
+                            />
+                          </div>
                         </TableCell>
-                    </TableRow>
+                      </TableRow>
                     ))}
                 </TableBody>
                 </Table>
