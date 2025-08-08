@@ -40,6 +40,7 @@ const Dock = React.forwardRef<HTMLDivElement, DockProps>(
         children as React.ReactElement<PropsWithChildren<DockItemProps>>[],
         (child) => {
           if (React.isValidElement(child)) {
+            // Ensure we are cloning only DockItem and passing the required props.
             return React.cloneElement(child, {
               magnification,
               distance,
@@ -80,13 +81,15 @@ const DockItem = ({
   children,
   magnification = 60,
   distance = 80,
-  mouseX = useMotionValue(Infinity),
+  mouseX,
   className,
   tooltip,
 }: DockItemProps) => {
   const ref = useRef<HTMLDivElement>(null);
+  
+  const mouseXValue = mouseX || useMotionValue(Infinity);
 
-  const distanceCalc = useTransform(mouseX, (val) => {
+  const distanceCalc = useTransform(mouseXValue, (val) => {
     const bounds = ref.current?.getBoundingClientRect() ?? { x: 0, width: 0 };
     return val - bounds.x - bounds.width / 2;
   });
