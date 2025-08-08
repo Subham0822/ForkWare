@@ -30,7 +30,7 @@ function LoginPageContent() {
   const [signupState, signupAction, isSignupPending] = useActionState(signup, null);
 
   useEffect(() => {
-    // If user is logged in (and not loading), redirect to profile
+    // This effect handles redirection for already logged-in users.
     if (!loading && user) {
       router.push('/profile');
     }
@@ -42,8 +42,8 @@ function LoginPageContent() {
         title: "Login Successful",
         description: "Redirecting to your profile...",
       });
-      // The user object listener will trigger the redirect.
-      // Forcing it here can be unreliable if the auth state hasn't propagated yet.
+      // The useUser hook will detect the user state change and handle the redirect.
+      // We can also force it here as a fallback.
       router.push('/profile');
     } else if (loginState?.success === false) {
       toast({
@@ -125,7 +125,7 @@ function LoginPageContent() {
                 </div>
               </CardContent>
               <CardFooter>
-                <Button className="w-full" type="submit" disabled={isLoginPending}>
+                <Button className="w-full" type="submit" disabled={isLoginPending || loading}>
                   {isLoginPending ? "Logging in..." : "Login"}
                 </Button>
               </CardFooter>
@@ -170,7 +170,7 @@ function LoginPageContent() {
                  <input type="hidden" name="role" value={currentRole} />
               </CardContent>
               <CardFooter>
-                <Button className="w-full" type="submit" disabled={isSignupPending}>
+                <Button className="w-full" type="submit" disabled={isSignupPending || loading}>
                     {isSignupPending ? "Creating Account..." : "Create Account"}
                 </Button>
               </CardFooter>

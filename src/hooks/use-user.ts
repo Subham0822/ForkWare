@@ -27,44 +27,48 @@ export function useUser() {
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
-      if (firebaseUser) {
-        // User is logged in, listen for profile changes
-        const userDocRef = doc(db, 'users', firebaseUser.uid);
-        const unsubscribeSnapshot = onSnapshot(userDocRef, (doc) => {
-          if (doc.exists()) {
-            setProfile(doc.data() as UserProfile);
-          } else {
-            setProfile(null);
-          }
-          setLoading(false);
-        }, (error) => {
-          console.error("Error fetching user profile:", error);
-          setProfile(null);
-          setLoading(false);
-        });
-        return () => unsubscribeSnapshot();
-      } else {
-        // User is not logged in
+      if (!firebaseUser) {
+        // If user is not logged in, clear profile and finish loading.
         setProfile(null);
         setLoading(false);
       }
     });
 
     return () => unsubscribeAuth();
-  }, []); // Empty dependency array ensures this runs only once on mount
+  }, []);
 
   useEffect(() => {
-    // This effect handles redirection logic after loading is complete
+    if (user) {
+      // User is logged in, listen for profile changes.
+      const userDocRef = doc(db, 'users', user.uid);
+      const unsubscribeSnapshot = onSnapshot(userDocRef, (doc) => {
+        if (doc.exists()) {
+          setProfile(doc.data() as UserProfile);
+        } else {
+          setProfile(null);
+        }
+        setLoading(false);
+      }, (error) => {
+        console.error("Error fetching user profile:", error);
+        setProfile(null);
+        setLoading(false);
+      });
+      return () => unsubscribeSnapshot();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    // This effect handles redirection logic after loading is complete.
     if (!loading) {
-      const isProtectedRoute = PROTECTED_ROUTES.includes(pathname);
+      const isProtectedRoute = PROTECTED_ROUTES.some(route => pathname.startsWith(route));
       
       if (!user && isProtectedRoute) {
-        // If user is not logged in and on a protected route, redirect to login
+        // If user is not logged in and on a protected route, redirect to login.
         router.push(PUBLIC_AUTH_ROUTE);
       }
       
       if (user && pathname === PUBLIC_AUTH_ROUTE) {
-        // If user is logged in and on the login page, redirect to profile
+        // If user is logged in and on the login page, redirect to profile.
         router.push('/profile');
       }
     }

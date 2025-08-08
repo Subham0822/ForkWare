@@ -21,7 +21,7 @@ export default function ProfilePage() {
   }
 
   if (!user) {
-     // useUser hook handles the redirect, this is a fallback.
+    // This case should be handled by the useUser hook redirecting, but as a fallback:
     return (
         <div className="container mx-auto py-10 text-center">
             <p>You must be logged in to view this page.</p>
