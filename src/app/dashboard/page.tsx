@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
 import { Clock, MapPin } from "lucide-react";
 import { AnimatedList } from "@/components/ui/animated-list";
+import { MagicCard } from "@/components/ui/magic-card";
 
 const mockListings = [
   {
@@ -63,44 +64,46 @@ export default function NGODashboard() {
           in real-time.
         </p>
       </div>
-      <AnimatedList className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {mockListings.map((item) => (
-          <Card
-            key={item.id}
-            className="flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow"
-          >
-            <CardHeader className="p-0">
-              <div className="relative h-48 w-full">
-                <Image
-                  src={item.image}
-                  alt={item.name}
-                  fill
-                  className="object-cover"
-                  data-ai-hint={item.hint}
-                />
-              </div>
-              <div className="p-4">
-                <Badge>Available</Badge>
-                <CardTitle className="font-headline mt-2">{item.name}</CardTitle>
-                <CardDescription>{item.quantity}</CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent className="flex-grow p-4 pt-0 space-y-2">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <MapPin className="h-4 w-4 flex-shrink-0" />
-                <span>{item.location}</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-destructive font-medium">
-                <Clock className="h-4 w-4 flex-shrink-0" />
-                <span>Expires {item.expires}</span>
-              </div>
-            </CardContent>
-            <CardFooter className="p-4 pt-0">
-              <Button className="w-full">Claim Pickup</Button>
-            </CardFooter>
-          </Card>
-        ))}
-      </AnimatedList>
+      <MagicCard>
+        <AnimatedList className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {mockListings.map((item) => (
+            <Card
+              key={item.id}
+              className="flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow"
+            >
+              <CardHeader className="p-0">
+                <div className="relative h-48 w-full">
+                  <Image
+                    src={item.image}
+                    alt={item.name}
+                    fill
+                    className="object-cover"
+                    data-ai-hint={item.hint}
+                  />
+                </div>
+                <div className="p-4">
+                  <Badge>Available</Badge>
+                  <CardTitle className="font-headline mt-2">{item.name}</CardTitle>
+                  <CardDescription>{item.quantity}</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="flex-grow p-4 pt-0 space-y-2">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <MapPin className="h-4 w-4 flex-shrink-0" />
+                  <span>{item.location}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-destructive font-medium">
+                  <Clock className="h-4 w-4 flex-shrink-0" />
+                  <span>Expires {item.expires}</span>
+                </div>
+              </CardContent>
+              <CardFooter className="p-4 pt-0">
+                <Button className="w-full">Claim Pickup</Button>
+              </CardFooter>
+            </Card>
+          ))}
+        </AnimatedList>
+      </MagicCard>
     </div>
   );
 }
