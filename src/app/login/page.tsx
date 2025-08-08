@@ -14,11 +14,40 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { useFormState } from "react-dom";
+import { signup, login } from "@/app/actions/auth";
+import { useToast } from "@/hooks/use-toast";
+import React from "react";
 
 function LoginPageContent() {
   const searchParams = useSearchParams();
   const role = searchParams.get("role") || "ngo";
   const isSignup = searchParams.get("signup") === "true";
+  const { toast } = useToast();
+
+  const [loginState, loginAction] = useFormState(login, undefined);
+  const [signupState, signupAction] = useFormState(signup, undefined);
+  
+  React.useEffect(() => {
+    if (loginState?.message) {
+      toast({
+        variant: loginState.success ? "default" : "destructive",
+        title: loginState.success ? "Success" : "Error",
+        description: loginState.message,
+      });
+    }
+  }, [loginState, toast]);
+
+  React.useEffect(() => {
+    if (signupState?.message) {
+      toast({
+        variant: signupState.success ? "default" : "destructive",
+        title: signupState.success ? "Success" : "Error",
+        description: signupState.message,
+      });
+    }
+  }, [signupState, toast]);
+
 
   const getRoleName = (role: string) => {
     if (role === "canteen") return "Canteen / Event";
@@ -36,72 +65,80 @@ function LoginPageContent() {
           <TabsTrigger value="signup">Sign Up</TabsTrigger>
         </TabsList>
         <TabsContent value="login">
-          <Card>
-            <CardHeader className="space-y-1 text-center">
-              <CardTitle className="text-2xl font-headline">
-                Login as {getRoleName(role)}
-              </CardTitle>
-              <CardDescription>
-                Enter your email below to login to your account
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email-login">Email</Label>
-                <Input
-                  id="email-login"
-                  type="email"
-                  placeholder="m@example.com"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password-login">Password</Label>
-                <Input id="password-login" type="password" required />
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button className="w-full">Login</Button>
-            </CardFooter>
-          </Card>
+          <form action={loginAction}>
+            <Card>
+              <CardHeader className="space-y-1 text-center">
+                <CardTitle className="text-2xl font-headline">
+                  Login as {getRoleName(role)}
+                </CardTitle>
+                <CardDescription>
+                  Enter your email below to login to your account
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email-login">Email</Label>
+                  <Input
+                    id="email-login"
+                    name="email"
+                    type="email"
+                    placeholder="m@example.com"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password-login">Password</Label>
+                  <Input id="password-login" name="password" type="password" required />
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button className="w-full">Login</Button>
+              </CardFooter>
+            </Card>
+          </form>
         </TabsContent>
         <TabsContent value="signup">
-          <Card>
-            <CardHeader className="space-y-1 text-center">
-              <CardTitle className="text-2xl font-headline">
-                Create a {getRoleName(role)} Account
-              </CardTitle>
-              <CardDescription>
-                Enter your information to create an account
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name-signup">Organization Name</Label>
-                <Input
-                  id="name-signup"
-                  placeholder="e.g. Campus Kitchen"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email-signup">Email</Label>
-                <Input
-                  id="email-signup"
-                  type="email"
-                  placeholder="m@example.com"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password-signup">Password</Label>
-                <Input id="password-signup" type="password" required />
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button className="w-full">Create Account</Button>
-            </CardFooter>
-          </Card>
+          <form action={signupAction}>
+            <Card>
+              <CardHeader className="space-y-1 text-center">
+                <CardTitle className="text-2xl font-headline">
+                  Create a {getRoleName(role)} Account
+                </CardTitle>
+                <CardDescription>
+                  Enter your information to create an account
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                 <div className="space-y-2">
+                  <Label htmlFor="name-signup">Organization Name</Label>
+                  <Input
+                    id="name-signup"
+                    name="name"
+                    placeholder="e.g. Campus Kitchen"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email-signup">Email</Label>
+                  <Input
+                    id="email-signup"
+                    name="email"
+                    type="email"
+                    placeholder="m@example.com"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password-signup">Password</Label>
+                  <Input id="password-signup" name="password" type="password" required />
+                </div>
+                 <input type="hidden" name="role" value={getRoleName(role)} />
+              </CardContent>
+              <CardFooter>
+                <Button className="w-full">Create Account</Button>
+              </CardFooter>
+            </Card>
+          </form>
         </TabsContent>
       </Tabs>
     </div>
