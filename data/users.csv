@@ -1,0 +1,2 @@
+uid,name,email,password,role,verified
+1,Admin User,admin@kindplate.com,password123,Admin,true

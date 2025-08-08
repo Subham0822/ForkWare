@@ -1,19 +1,19 @@
-
 'use client';
 
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/hooks/use-user';
-import { auth } from '@/lib/firebase';
+import { logout } from '@/app/actions/auth';
 
 export default function ProfilePage() {
   const router = useRouter();
   const { user, profile, loading } = useUser();
 
   const handleLogout = async () => {
-    await auth.signOut();
-    router.push('/login');
+    await logout();
+     // This event is to notify other tabs to log out
+    window.localStorage.setItem('logout-event', `logout-${Date.now()}`);
   };
 
   if (loading) {
@@ -63,9 +63,11 @@ export default function ProfilePage() {
                 <p className="text-amber-600">Pending Verification. An admin will review your request soon.</p>
             )}
           </div>
-          <Button onClick={handleLogout} className="w-full" variant="outline">
-            Logout
-          </Button>
+          <form action={handleLogout}>
+            <Button type="submit" className="w-full" variant="outline">
+                Logout
+            </Button>
+          </form>
         </CardContent>
       </Card>
     </div>

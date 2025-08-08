@@ -1,85 +1,90 @@
-
 'use client';
 
-import { useEffect, useState } from 'react';
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
-import { useRouter, usePathname } from 'next/navigation';
+import { useEffect, useState, useCallback } from 'react';
+import { getSession } from '@/app/actions/auth';
+import { usePathname, useRouter } from 'next/navigation';
+import { jwtDecode } from 'jwt-decode';
+import { getCookie } from 'cookies-next';
+
 
 interface UserProfile {
+  uid: string;
   name: string;
   email: string;
   role: string;
   verified: boolean;
 }
 
-const PROTECTED_ROUTES = ['/profile'];
+const PROTECTED_ROUTES = ['/profile', '/admin', '/canteen', '/dashboard', '/analytics'];
 const PUBLIC_AUTH_ROUTE = '/login';
+
+// A simple in-memory cache to avoid re-fetching the session on every render.
+let cachedProfile: UserProfile | null = null;
+
+function getProfileFromCookie(): UserProfile | null {
+    const cookie = getCookie('session');
+    if (!cookie) return null;
+    try {
+        const decoded: UserProfile = jwtDecode(cookie);
+        return decoded;
+    } catch (e) {
+        return null;
+    }
+}
+
 
 export function useUser() {
   const router = useRouter();
   const pathname = usePathname();
-  const [user, setUser] = useState<FirebaseUser | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(cachedProfile);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser);
-      if (!firebaseUser) {
-        // If user is not logged in, clear profile and finish loading.
-        setProfile(null);
+  const checkSession = useCallback(async () => {
+    setLoading(true);
+    // Try to get profile from client-side cookie first for speed
+    const clientProfile = getProfileFromCookie();
+    if(clientProfile) {
+        cachedProfile = clientProfile;
+        setProfile(clientProfile);
         setLoading(false);
-      }
-    });
+        return;
+    }
 
-    return () => unsubscribeAuth();
+    // If not, verify session with server
+    const sessionProfile = await getSession();
+    cachedProfile = sessionProfile;
+    setProfile(sessionProfile);
+    setLoading(false);
   }, []);
 
   useEffect(() => {
-    let unsubscribeSnapshot = () => {};
-    if (user) {
-      // User is logged in, listen for profile changes.
-      setLoading(true); // Set loading to true while we fetch profile
-      const userDocRef = doc(db, 'users', user.uid);
-      unsubscribeSnapshot = onSnapshot(userDocRef, (doc) => {
-        if (doc.exists()) {
-          setProfile(doc.data() as UserProfile);
-        } else {
-          setProfile(null);
-        }
-        setLoading(false);
-      }, (error) => {
-        console.error("Error fetching user profile:", error);
-        setProfile(null);
-        setLoading(false);
-      });
-    } else {
-      // No user, so no profile to fetch and not loading.
-      setProfile(null);
-      setLoading(false);
-    }
-    return () => unsubscribeSnapshot();
-  }, [user]);
+    checkSession();
+  }, [pathname, checkSession]); // Re-check session on path change
 
   useEffect(() => {
-    // This effect handles redirection logic after loading is complete.
     if (!loading) {
       const isProtectedRoute = PROTECTED_ROUTES.some(route => pathname.startsWith(route));
-      
-      if (!user && isProtectedRoute) {
-        // If user is not logged in and on a protected route, redirect to login.
+      if (!profile && isProtectedRoute) {
         router.push(PUBLIC_AUTH_ROUTE);
       }
-      
-      // This part was causing issues when a logged-in user refreshed the login page.
-      // It's better to handle this inside the login page itself.
-      // if (user && pathname === PUBLIC_AUTH_ROUTE) {
-      //   router.push('/profile');
-      // }
     }
-  }, [user, profile, loading, pathname, router]);
+  }, [profile, loading, pathname, router]);
 
-  return { user, profile, loading };
+  // This is a simple way to sync state across tabs
+  useEffect(() => {
+      const syncLogout = (event: StorageEvent) => {
+        if (event.key === 'logout-event') {
+          cachedProfile = null;
+          setProfile(null);
+          router.push(PUBLIC_AUTH_ROUTE);
+        }
+      }
+      window.addEventListener('storage', syncLogout)
+      return () => {
+        window.removeEventListener('storage', syncLogout)
+      }
+  }, [router]);
+
+
+  return { user: profile, profile, loading };
 }

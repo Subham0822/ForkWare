@@ -77,10 +77,15 @@ export default function AdminDashboard() {
   const fetchUsers = async () => {
     setIsLoading(true);
     try {
-      const usersCollection = collection(db, 'users');
-      const userSnapshot = await getDocs(usersCollection);
-      const userList = userSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-      setUsers(userList);
+      // Note: With CSV, we can't easily fetch users on the client.
+      // This part of the UI would need a dedicated API route to read the CSV on the server.
+      // For now, this will likely not display any users.
+      console.warn("User fetching is not implemented for CSV storage. This list will be empty.");
+      setUsers([]);
+      // const usersCollection = collection(db, 'users');
+      // const userSnapshot = await getDocs(usersCollection);
+      // const userList = userSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+      // setUsers(userList);
     } catch (error) {
       console.error("Failed to fetch users:", error);
       toast({ variant: "destructive", title: "Error", description: "Failed to fetch users." });
@@ -113,20 +118,18 @@ export default function AdminDashboard() {
 
 
   const handleRoleChange = async (userId: string, newRole: string) => {
-    const userRef = doc(db, 'users', userId);
-    await updateDoc(userRef, { role: newRole });
-    setUsers(users.map(user => user.id === userId ? { ...user, role: newRole } : user));
+    // This functionality is complex with a CSV file and would require a dedicated server action.
+    toast({ variant: "destructive", title: "Not Implemented", description: "Changing roles is not supported with CSV storage."});
   };
   
   const handleVerificationChange = async (userId: string, verified: boolean) => {
-    const userRef = doc(db, 'users', userId);
-    await updateDoc(userRef, { verified });
-    setUsers(users.map(user => user.id === userId ? { ...user, verified } : user));
+    // This functionality is complex with a CSV file and would require a dedicated server action.
+    toast({ variant: "destructive", title: "Not Implemented", description: "Changing verification is not supported with CSV storage."});
   };
 
   function onSurplusSubmit(data: SurplusFormValues) {
     console.log(data);
-    // Here you would handle form submission to Firebase
+    // Here you would handle form submission to your backend
   }
 
   return (
@@ -187,7 +190,7 @@ export default function AdminDashboard() {
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="font-headline">User Management</CardTitle>
-                <CardDescription>View and manage user roles across the platform.</CardDescription>
+                <CardDescription>Note: User management is limited with CSV storage.</CardDescription>
               </div>
               <div className="flex items-center gap-2">
                  <Button variant="outline" size="sm" onClick={() => setIsAddUserDialogOpen(true)}>
@@ -201,6 +204,7 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent>
                 {isLoading ? <p>Loading users...</p> : (
+                  users.length === 0 ? <p>User list is unavailable with CSV storage.</p> :
                 <Table>
                 <TableHeader>
                     <TableRow>
@@ -252,7 +256,7 @@ export default function AdminDashboard() {
                 <DialogHeader>
                     <DialogTitle>Add New User</DialogTitle>
                     <DialogDescription>
-                        Create a new user account and assign them a role.
+                        Create a new user account and assign them a role. The user will be saved to the local CSV file.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
@@ -284,7 +288,7 @@ export default function AdminDashboard() {
                                 <FormControl>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select a role" />
-                                    </SelectTrigger>
+                                    </Trigger>
                                 </FormControl>
                                 <SelectContent>
                                     <SelectItem value="Admin">Admin</SelectItem>

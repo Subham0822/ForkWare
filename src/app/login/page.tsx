@@ -42,9 +42,10 @@ function LoginPageContent() {
         title: "Login Successful",
         description: "Redirecting to your profile...",
       });
-      // The useUser hook will detect the user state change and handle the redirect.
-      // We can also force it here as a fallback.
+      // We need to trigger a refresh or redirect to let the `useUser` hook
+      // pick up the new cookie session.
       router.push('/profile');
+      router.refresh(); // Force a refresh to update layout and user state
     } else if (loginState?.success === false) {
       toast({
         variant: "destructive",
