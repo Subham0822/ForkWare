@@ -14,7 +14,7 @@ interface UserProfile {
   verified: boolean;
 }
 
-const PROTECTED_ROUTES = ['/profile', '/admin'];
+const PROTECTED_ROUTES = ['/profile'];
 const PUBLIC_AUTH_ROUTE = '/login';
 
 export function useUser() {
@@ -38,10 +38,12 @@ export function useUser() {
   }, []);
 
   useEffect(() => {
+    let unsubscribeSnapshot = () => {};
     if (user) {
       // User is logged in, listen for profile changes.
+      setLoading(true); // Set loading to true while we fetch profile
       const userDocRef = doc(db, 'users', user.uid);
-      const unsubscribeSnapshot = onSnapshot(userDocRef, (doc) => {
+      unsubscribeSnapshot = onSnapshot(userDocRef, (doc) => {
         if (doc.exists()) {
           setProfile(doc.data() as UserProfile);
         } else {
@@ -53,8 +55,12 @@ export function useUser() {
         setProfile(null);
         setLoading(false);
       });
-      return () => unsubscribeSnapshot();
+    } else {
+      // No user, so no profile to fetch and not loading.
+      setProfile(null);
+      setLoading(false);
     }
+    return () => unsubscribeSnapshot();
   }, [user]);
 
   useEffect(() => {
@@ -67,12 +73,13 @@ export function useUser() {
         router.push(PUBLIC_AUTH_ROUTE);
       }
       
-      if (user && pathname === PUBLIC_AUTH_ROUTE) {
-        // If user is logged in and on the login page, redirect to profile.
-        router.push('/profile');
-      }
+      // This part was causing issues when a logged-in user refreshed the login page.
+      // It's better to handle this inside the login page itself.
+      // if (user && pathname === PUBLIC_AUTH_ROUTE) {
+      //   router.push('/profile');
+      // }
     }
-  }, [user, loading, pathname, router]);
+  }, [user, profile, loading, pathname, router]);
 
   return { user, profile, loading };
 }
