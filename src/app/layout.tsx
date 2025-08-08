@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./nprogress.css";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "@/components/theme-provider";
+import { PageLoader } from "@/components/page-loader";
+import { Suspense } from "react";
 
 export const metadata: Metadata = {
   title: "KindPlate",
@@ -30,6 +33,9 @@ export default function RootLayout({
         />
       </head>
       <body className="font-body antialiased flex flex-col min-h-screen">
+        <Suspense>
+          <PageLoader />
+        </Suspense>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
