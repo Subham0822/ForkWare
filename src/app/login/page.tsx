@@ -14,10 +14,9 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { useFormState } from "react-dom";
 import { signup, login } from "@/app/actions/auth";
 import { useToast } from "@/hooks/use-toast";
-import React from "react";
+import React, { useActionState } from "react";
 
 function LoginPageContent() {
   const searchParams = useSearchParams();
@@ -25,8 +24,8 @@ function LoginPageContent() {
   const isSignup = searchParams.get("signup") === "true";
   const { toast } = useToast();
 
-  const [loginState, loginAction] = useFormState(login, undefined);
-  const [signupState, signupAction] = useFormState(signup, undefined);
+  const [loginState, loginAction] = useActionState(login, undefined);
+  const [signupState, signupAction] = useActionState(signup, undefined);
   
   React.useEffect(() => {
     if (loginState?.message) {
