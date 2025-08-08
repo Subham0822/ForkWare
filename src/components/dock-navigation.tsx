@@ -1,32 +1,41 @@
+
 'use client';
 
 import Link from "next/link";
-import { Button } from "./ui/button";
 import { Home, Utensils, Users, BarChart2 } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
 import { Dock, DockItem } from "./ui/dock";
 
-export function DockNavigation() {
+const navItems = [
+    { label: "Home", href: "/", icon: Home },
+    { label: "Canteen", href: "/canteen", icon: Utensils },
+    { label: "Volunteer", href: "/dashboard", icon: Users },
+    { label: "Analytics", href: "/analytics", icon: BarChart2 },
+];
 
-  const navItems = [
-    { label: "Home", href: "/", icon: Home, tooltip: "Home" },
-    { label: "Canteen", href: "/canteen", icon: Utensils, tooltip: "Canteen" },
-    { label: "Volunteer", href: "/dashboard", icon: Users, tooltip: "Volunteer" },
-    { label: "Analytics", href: "/analytics", icon: BarChart2, tooltip: "Analytics" },
-  ];
+export function DockNavigation() {
+  const pathname = usePathname();
 
   return (
-    <footer className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2">
-        <Dock>
-          {navItems.map((item) => (
-             <DockItem key={item.label} tooltip={item.tooltip}>
-                <Link href={item.href}>
-                  <Button variant="ghost" size="icon">
-                    <item.icon />
-                  </Button>
-                </Link>
-            </DockItem>
-          ))}
-        </Dock>
-    </footer>
+    <div className="fixed bottom-10 inset-x-0 w-full z-50 flex justify-center">
+      <Dock>
+        {navItems.map((item) => (
+          <DockItem key={item.label} tooltip={item.label}>
+            <Link
+              href={item.href}
+              className={cn(
+                "flex items-center justify-center rounded-full w-12 h-12 bg-background/80 backdrop-blur-md shadow-inner ring-1 ring-black/10 dark:ring-white/10 transition-transform hover:scale-105",
+                pathname === item.href 
+                  ? "bg-primary/70 text-primary-foreground" 
+                  : "hover:bg-accent hover:text-accent-foreground"
+              )}
+            >
+              <item.icon className="h-5 w-5" />
+            </Link>
+          </DockItem>
+        ))}
+      </Dock>
+    </div>
   );
 }
