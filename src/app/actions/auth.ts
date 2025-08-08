@@ -14,6 +14,7 @@ export async function signup(prevState: any, formData: FormData) {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
 
+    // Customers are verified by default. Other roles need admin approval.
     const isVerified = role === 'Customer';
 
     await setDoc(doc(db, "users", user.uid), {
@@ -26,7 +27,7 @@ export async function signup(prevState: any, formData: FormData) {
     
     return { success: true, message: 'Account created successfully! You can now login.' };
   } catch (error: any) {
-    return { success: false, message: error.message };
+    return { success: false, message: error.message || 'An unknown error occurred during signup.' };
   }
 }
 
@@ -50,7 +51,7 @@ export async function login(prevState: any, formData: FormData) {
                     errorMessage = 'Please enter a valid email address.';
                     break;
                 default:
-                    errorMessage = 'Invalid login credentials. Please try again.';
+                    errorMessage = 'An error occurred during login. Please try again.';
             }
         } else if (error.message) {
             errorMessage = error.message;

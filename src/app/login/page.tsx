@@ -28,13 +28,13 @@ function LoginPageContent() {
   const [signupState, signupAction, isSignupPending] = useActionState(signup, null);
   
   useEffect(() => {
-    if (loginState?.success) {
+    if (loginState?.success === true) {
       toast({
         title: "Login Successful",
         description: "Redirecting to your profile...",
       });
       router.push('/profile');
-    } else if (loginState?.message) {
+    } else if (loginState?.success === false) {
       toast({
         variant: "destructive",
         title: "Login Failed",
@@ -44,15 +44,21 @@ function LoginPageContent() {
   }, [loginState, router, toast]);
 
   useEffect(() => {
-    if (signupState?.message) {
-      toast({
-        variant: signupState.success ? "default" : "destructive",
-        title: signupState.success ? "Success" : "Signup Failed",
+    if (signupState?.success === true) {
+       toast({
+        variant: "default",
+        title: "Success",
         description: signupState.message,
       });
        if (signupState.success) {
         router.push('/login?role=' + role);
       }
+    } else if (signupState?.success === false) {
+        toast({
+            variant: "destructive",
+            title: "Signup Failed",
+            description: signupState.message,
+        });
     }
   }, [signupState, toast, role, router]);
 
