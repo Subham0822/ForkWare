@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { KindPlateLogo } from "./logo";
 import { Button } from "./ui/button";
-import { Home, UserCircle, Settings, BarChart2, Utensils, Users, LogIn, UserPlus } from "lucide-react";
+import { Home, UserCircle, BarChart2, Utensils, Users, LogIn } from "lucide-react";
 import { useUser } from "@/hooks/use-user";
 import { ThemeToggle } from "./theme-toggle";
 import { Dock, DockItem } from "./ui/dock";
 
 export function Header() {
-  const { user, profile } = useUser();
+  const { user } = useUser();
 
   const navItems = [
     { label: "Home", href: "/", icon: Home, tooltip: "Home" },
@@ -17,8 +17,6 @@ export function Header() {
     { label: "Volunteer", href: "/dashboard", icon: Users, tooltip: "Volunteer" },
     { label: "Analytics", href: "/analytics", icon: BarChart2, tooltip: "Analytics" },
   ];
-  
-  const adminNav = { label: "Admin", href: "/admin", icon: Settings, tooltip: "Admin" };
 
   return (
     <header className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2">
@@ -37,15 +35,6 @@ export function Header() {
                 </Link>
             </DockItem>
           ))}
-           {profile?.role === 'Admin' && (
-              <DockItem tooltip={adminNav.tooltip}>
-                <Link href={adminNav.href}>
-                   <Button variant="ghost" size="icon">
-                    <adminNav.icon />
-                  </Button>
-                </Link>
-              </DockItem>
-           )}
 
           <DockItem tooltip="Theme">
              <ThemeToggle />
@@ -60,22 +49,13 @@ export function Header() {
                 </Link>
               </DockItem>
             ) : (
-              <>
-                <DockItem tooltip="Login">
-                  <Link href="/login">
-                    <Button variant="ghost" size="icon">
-                        <LogIn />
-                    </Button>
-                  </Link>
-                </DockItem>
-                 <DockItem tooltip="Sign Up">
-                  <Link href="/login?signup=true">
-                    <Button variant="ghost" size="icon">
-                        <UserPlus />
-                    </Button>
-                  </Link>
-                </DockItem>
-              </>
+              <DockItem tooltip="Login">
+                <Link href="/login">
+                  <Button variant="ghost" size="icon">
+                      <LogIn />
+                  </Button>
+                </Link>
+              </DockItem>
             )}
         </Dock>
     </header>
