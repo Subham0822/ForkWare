@@ -26,8 +26,8 @@ export const TypeAnimation = ({ text, className, delay = 0 }: ITypeAnimation) =>
   }, [count, text, delay]);
 
   return (
-    <motion.h1 className={className}>
-      {displayText}
+    <h1 className={cn(className)}>
+      <motion.span>{displayText}</motion.span>
       <motion.span
         className="inline-block h-full w-px"
         style={{
@@ -38,6 +38,6 @@ export const TypeAnimation = ({ text, className, delay = 0 }: ITypeAnimation) =>
         animate={{ opacity: [0, 1, 0] }}
         transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
       />
-    </motion.h1>
+    </h1>
   );
 };

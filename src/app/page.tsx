@@ -86,7 +86,7 @@ export default function Home() {
           >
             <BentoGrid className="lg:grid-rows-1">
               {features.map((feature) => (
-                <BentoCard key={feature.name} {...feature}>
+                <BentoCard key={feature.name} className={feature.className}>
                   <div className="flex h-full flex-col gap-4 p-4">
                     <div className="mx-auto bg-primary/10 rounded-full p-4 w-fit">
                       <feature.Icon className="h-8 w-8 text-primary" />
