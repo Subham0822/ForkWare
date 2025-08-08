@@ -28,14 +28,20 @@ function LoginPageContent() {
   const [signupState, signupAction, isSignupPending] = useActionState(signup, null);
   
   useEffect(() => {
-    if (loginState?.message) {
+    if (loginState?.success) {
       toast({
-        variant: loginState.success ? "default" : "destructive",
-        title: loginState.success ? "Success" : "Login Failed",
+        title: "Login Successful",
+        description: "Redirecting to your profile...",
+      });
+      router.push('/profile');
+    } else if (loginState?.message) {
+      toast({
+        variant: "destructive",
+        title: "Login Failed",
         description: loginState.message,
       });
     }
-  }, [loginState, toast]);
+  }, [loginState, toast, router]);
 
   useEffect(() => {
     if (signupState?.message) {
@@ -45,7 +51,6 @@ function LoginPageContent() {
         description: signupState.message,
       });
        if (signupState.success) {
-        // To switch to the login tab after successful signup
         router.push('/login?role=' + role);
       }
     }
@@ -68,6 +73,7 @@ function LoginPageContent() {
       <Tabs
         defaultValue={isSignup ? "signup" : "login"}
         className="w-full max-w-md"
+        onValueChange={(value) => router.push(`/login?role=${role}${value === 'signup' ? '&signup=true' : ''}`)}
       >
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="login">Login</TabsTrigger>
