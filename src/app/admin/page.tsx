@@ -1,22 +1,24 @@
+
 'use client';
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useActionState } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { signup } from '@/app/actions/auth';
+import { useToast } from "@/hooks/use-toast";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { FileUp, RefreshCw } from "lucide-react";
+import { FileUp, RefreshCw, UserPlus } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 
 const surplusFormSchema = z.object({
   foodName: z.string().min(2, "Food name must be at least 2 characters."),
@@ -28,6 +30,15 @@ const surplusFormSchema = z.object({
 
 type SurplusFormValues = z.infer<typeof surplusFormSchema>;
 
+const addUserFormSchema = z.object({
+    name: z.string().min(2, "Name must be at least 2 characters."),
+    email: z.string().email("Please enter a valid email."),
+    password: z.string().min(6, "Password must be at least 6 characters."),
+    role: z.string().min(1, "Please select a role."),
+});
+
+type AddUserFormValues = z.infer<typeof addUserFormSchema>;
+
 interface User {
     id: string;
     email: string;
@@ -38,19 +49,68 @@ interface User {
 export default function AdminDashboard() {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
+  const { toast } = useToast();
+
+  const [signupState, signupAction, isSignupPending] = useActionState(signup, null);
+
+  const surplusForm = useForm<SurplusFormValues>({
+    resolver: zodResolver(surplusFormSchema),
+    defaultValues: {
+      foodName: "",
+      quantity: "",
+      expiryDate: "",
+      pickupLocation: "",
+    },
+  });
+
+  const addUserForm = useForm<AddUserFormValues>({
+    resolver: zodResolver(addUserFormSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+      role: "Customer",
+    },
+  });
 
   const fetchUsers = async () => {
     setIsLoading(true);
-    const usersCollection = collection(db, 'users');
-    const userSnapshot = await getDocs(usersCollection);
-    const userList = userSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-    setUsers(userList);
-    setIsLoading(false);
+    try {
+      const usersCollection = collection(db, 'users');
+      const userSnapshot = await getDocs(usersCollection);
+      const userList = userSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+      setUsers(userList);
+    } catch (error) {
+      console.error("Failed to fetch users:", error);
+      toast({ variant: "destructive", title: "Error", description: "Failed to fetch users." });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  useEffect(() => {
+    if (signupState?.success) {
+      toast({
+        title: "Success",
+        description: "User created successfully!",
+      });
+      setIsAddUserDialogOpen(false);
+      addUserForm.reset();
+      fetchUsers(); // Refresh the user list
+    } else if (signupState?.success === false) {
+      toast({
+        variant: "destructive",
+        title: "Failed to Create User",
+        description: signupState.message,
+      });
+    }
+  }, [signupState, toast, addUserForm]);
+
 
   const handleRoleChange = async (userId: string, newRole: string) => {
     const userRef = doc(db, 'users', userId);
@@ -64,17 +124,7 @@ export default function AdminDashboard() {
     setUsers(users.map(user => user.id === userId ? { ...user, verified } : user));
   };
 
-  const form = useForm<SurplusFormValues>({
-    resolver: zodResolver(surplusFormSchema),
-    defaultValues: {
-      foodName: "",
-      quantity: "",
-      expiryDate: "",
-      pickupLocation: "",
-    },
-  });
-
-  function onSubmit(data: SurplusFormValues) {
+  function onSurplusSubmit(data: SurplusFormValues) {
     console.log(data);
     // Here you would handle form submission to Firebase
   }
@@ -89,30 +139,30 @@ export default function AdminDashboard() {
             <CardDescription>Fill out the form to list new or update surplus items.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <FormField control={form.control} name="foodName" render={({ field }) => (
+            <Form {...surplusForm}>
+              <form onSubmit={surplusForm.handleSubmit(onSurplusSubmit)} className="space-y-6">
+                <FormField control={surplusForm.control} name="foodName" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Food Name</FormLabel>
                     <FormControl><Input placeholder="e.g. Fresh Sandwiches" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
-                <FormField control={form.control} name="quantity" render={({ field }) => (
+                <FormField control={surplusForm.control} name="quantity" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Quantity</FormLabel>
                     <FormControl><Input placeholder="e.g. 20 units" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
-                <FormField control={form.control} name="expiryDate" render={({ field }) => (
+                <FormField control={surplusForm.control} name="expiryDate" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Expiry Date & Time</FormLabel>
                     <FormControl><Input type="datetime-local" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
-                 <FormField control={form.control} name="pickupLocation" render={({ field }) => (
+                 <FormField control={surplusForm.control} name="pickupLocation" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Pickup Location</FormLabel>
                     <FormControl><Input placeholder="e.g. Main Canteen, Block A" {...field} /></FormControl>
@@ -139,9 +189,15 @@ export default function AdminDashboard() {
                 <CardTitle className="font-headline">User Management</CardTitle>
                 <CardDescription>View and manage user roles across the platform.</CardDescription>
               </div>
-              <Button variant="ghost" size="icon" onClick={fetchUsers} disabled={isLoading}>
-                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-              </Button>
+              <div className="flex items-center gap-2">
+                 <Button variant="outline" size="sm" onClick={() => setIsAddUserDialogOpen(true)}>
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Add User
+                </Button>
+                <Button variant="ghost" size="icon" onClick={fetchUsers} disabled={isLoading}>
+                    <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
                 {isLoading ? <p>Loading users...</p> : (
@@ -188,6 +244,71 @@ export default function AdminDashboard() {
             </CardContent>
         </Card>
       </div>
+
+       <Dialog open={isAddUserDialogOpen} onOpenChange={setIsAddUserDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+           <Form {...addUserForm}>
+              <form action={signupAction} className="space-y-4">
+                <DialogHeader>
+                    <DialogTitle>Add New User</DialogTitle>
+                    <DialogDescription>
+                        Create a new user account and assign them a role.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                   <FormField control={addUserForm.control} name="name" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Name</FormLabel>
+                        <FormControl><Input placeholder="John Doe" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                     <FormField control={addUserForm.control} name="email" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl><Input type="email" placeholder="user@example.com" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={addUserForm.control} name="password" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Password</FormLabel>
+                        <FormControl><Input type="password" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={addUserForm.control} name="role" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Role</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select a role" />
+                                    </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    <SelectItem value="Admin">Admin</SelectItem>
+                                    <SelectItem value="Canteen / Event">Canteen / Event</SelectItem>
+                                    <SelectItem value="NGO / Volunteer">NGO / Volunteer</SelectItem>
+                                    <SelectItem value="Customer">Customer</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild>
+                        <Button type="button" variant="secondary">Cancel</Button>
+                    </DialogClose>
+                    <Button type="submit" disabled={isSignupPending}>
+                        {isSignupPending ? "Creating User..." : "Create User"}
+                    </Button>
+                </DialogFooter>
+              </form>
+           </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
