@@ -16,16 +16,24 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense, useEffect, useActionState } from "react";
 import { signup, login } from "@/app/actions/auth";
 import { useToast } from "@/hooks/use-toast";
+import { useUser } from "@/hooks/use-user";
 
 function LoginPageContent() {
-  const searchParams = useSearchParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const role = searchParams.get("role") || "ngo";
   const isSignup = searchParams.get("signup") === "true";
   const { toast } = useToast();
+  const { user } = useUser();
 
   const [loginState, loginAction, isLoginPending] = useActionState(login, null);
   const [signupState, signupAction, isSignupPending] = useActionState(signup, null);
+
+  useEffect(() => {
+    if (user) {
+      router.push('/profile');
+    }
+  }, [user, router]);
   
   useEffect(() => {
     if (loginState?.success === true) {
@@ -33,7 +41,9 @@ function LoginPageContent() {
         title: "Login Successful",
         description: "Redirecting to your profile...",
       });
-      router.push('/profile');
+      // The user object listener in the main layout will trigger the redirect.
+      // Forcing it here can be unreliable if the auth state hasn't propagated yet.
+       router.push('/profile');
     } else if (loginState?.success === false) {
       toast({
         variant: "destructive",

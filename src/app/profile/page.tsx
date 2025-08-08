@@ -21,11 +21,11 @@ export default function ProfilePage() {
   }
 
   if (!user || !profile) {
-    // This state should ideally not be reached if the hook's redirect works correctly
-    // It's a fallback.
+    // This state is hit if useUser hook redirects. It's a fallback.
+    // The hook should handle the redirect now.
     return (
         <div className="container mx-auto py-10 text-center">
-            <p>Could not load profile. You might not be logged in.</p>
+            <p>You must be logged in to view this page.</p>
             <Button onClick={() => router.push('/login')} className="mt-4">Go to Login</Button>
         </div>
     );

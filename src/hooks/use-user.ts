@@ -14,6 +14,8 @@ interface UserProfile {
   verified: boolean;
 }
 
+const PROTECTED_ROUTES = ['/profile', '/admin', '/canteen', '/dashboard', '/analytics'];
+
 export function useUser() {
   const router = useRouter();
   const pathname = usePathname();
@@ -22,14 +24,33 @@ export function useUser() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
-      setLoading(true); // Start loading when auth state changes
-      setUser(currentUser);
-      if (!currentUser) {
+    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+      setLoading(true);
+      setUser(firebaseUser);
+
+      if (firebaseUser) {
+        // User is logged in, listen for profile changes
+        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        const unsubscribeSnapshot = onSnapshot(userDocRef, (doc) => {
+          if (doc.exists()) {
+            setProfile(doc.data() as UserProfile);
+          } else {
+            // This case might happen if a user is deleted from Firestore but not from Auth
+            setProfile(null);
+          }
+          setLoading(false);
+        }, (error) => {
+          console.error("Error fetching user profile:", error);
+          setProfile(null);
+          setLoading(false);
+        });
+        return () => unsubscribeSnapshot();
+      } else {
+        // User is not logged in
         setProfile(null);
         setLoading(false);
-        // Only redirect if they are on a protected page and not logged in
-        if (pathname === '/profile' || pathname === '/admin' || pathname === '/canteen' || pathname === '/dashboard' || pathname === '/analytics') {
+        // If the user is on a protected page, redirect them to login
+        if (PROTECTED_ROUTES.includes(pathname)) {
           router.push('/login');
         }
       }
@@ -37,27 +58,6 @@ export function useUser() {
 
     return () => unsubscribeAuth();
   }, [pathname, router]);
-
-  useEffect(() => {
-    if (user) {
-      const userDocRef = doc(db, 'users', user.uid);
-      const unsubscribeSnapshot = onSnapshot(userDocRef, (doc) => {
-        if (doc.exists()) {
-          setProfile(doc.data() as UserProfile);
-        } else {
-          setProfile(null);
-        }
-        setLoading(false);
-      }, (error) => {
-        console.error("Error fetching user profile:", error);
-        setProfile(null);
-        setLoading(false);
-      });
-      
-      return () => unsubscribeSnapshot();
-    }
-    // No need for an else block, the auth listener handles the null user case
-  }, [user]);
 
   return { user, profile, loading };
 }
