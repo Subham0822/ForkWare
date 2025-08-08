@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import React, { useState, useEffect } from 'react';
 import { useActionState } from 'react';
-import { signup } from '@/app/actions/auth';
+import { signup, updateUserRole } from '@/app/actions/auth';
 import { useToast } from "@/hooks/use-toast";
 
 import { Button } from "@/components/ui/button";
@@ -38,7 +38,7 @@ const addUserFormSchema = z.object({
 type AddUserFormValues = z.infer<typeof addUserFormSchema>;
 
 interface User {
-    id: string;
+    uid: string;
     email: string;
     role: string;
     verified: boolean;
@@ -75,11 +75,15 @@ export default function AdminDashboard() {
   const fetchUsers = async () => {
     setIsLoading(true);
     try {
-      // Note: With CSV, we can't easily fetch users on the client.
-      // This part of the UI would need a dedicated API route to read the CSV on the server.
-      // For now, this will likely not display any users.
-      console.warn("User fetching is not implemented for CSV storage. This list will be empty.");
-      setUsers([]);
+      console.log('Fetching users from /api/users...');
+      const response = await fetch('/api/users');
+      console.log('API response:', response);
+      const data = await response.json();
+      console.log('API response data:', data, 'Type:', typeof data, 'Is Array:', Array.isArray(data));
+      setUsers(data);
+      // Log individual user objects to inspect email property
+      console.log('Individual user data after fetch:');
+      data.forEach((user: any) => console.log('User:', user, 'Email Type:', typeof user.email));
     } catch (error) {
       console.error("Failed to fetch users:", error);
       toast({ variant: "destructive", title: "Error", description: "Failed to fetch users." });
@@ -112,8 +116,18 @@ export default function AdminDashboard() {
 
 
   const handleRoleChange = async (userId: string, newRole: string) => {
-    // This functionality is complex with a CSV file and would require a dedicated server action.
-    toast({ variant: "destructive", title: "Not Implemented", description: "Changing roles is not supported with CSV storage."});
+ try {
+ const result = await updateUserRole(userId, newRole);
+ if (result.success) {
+ toast({ title: "Success", description: result.message });
+ await fetchUsers(); // Refresh the user list after successful update
+ } else {
+ toast({ variant: "destructive", title: "Error", description: result.message });
+ }
+    } catch (error) {
+      console.error("Failed to update user role:", error);
+      toast({ variant: "destructive", title: "Error", description: "An unexpected error occurred." });
+    }
   };
   
   const handleVerificationChange = async (userId: string, verified: boolean) => {
@@ -209,10 +223,9 @@ export default function AdminDashboard() {
                 </TableHeader>
                 <TableBody>
                     {users.map((user) => (
-                    <TableRow key={user.id}>
-                        <TableCell className="font-medium">{user.email}</TableCell>
-                        <TableCell>
-                            <Select defaultValue={user.role} onValueChange={(newRole) => handleRoleChange(user.id, newRole)}>
+                       <TableRow key={(user || {}).uid}>
+ <TableCell className="font-medium">{user.email}</TableCell> {/* Ensure user.email is displayed here */}                      <TableCell>
+                            <Select defaultValue={user.role} onValueChange={(newRole) => handleRoleChange(user.uid, newRole)}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select role" />
                                 </SelectTrigger>
@@ -227,9 +240,9 @@ export default function AdminDashboard() {
                          <TableCell className="text-center">
                             <div className="flex items-center justify-center space-x-2">
                                 <Switch
-                                    id={`verified-switch-${user.id}`}
+                                    id={`verified-switch-${user.uid}`}
                                     checked={user.verified}
-                                    onCheckedChange={(checked) => handleVerificationChange(user.id, checked)}
+                                    onCheckedChange={(checked) => handleVerificationChange(user.uid, checked)}
                                     aria-readonly
                                 />
                             </div>
@@ -282,7 +295,7 @@ export default function AdminDashboard() {
                                 <FormControl>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select a role" />
-                                    </Trigger>
+                                    </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
                                     <SelectItem value="Admin">Admin</SelectItem>

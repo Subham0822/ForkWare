@@ -14,11 +14,12 @@ interface UserPayload {
   email: string;
   role: string;
   verified: boolean;
+  [key: string]: any; // Add this index signature
 }
 
 const csvFilePath = path.join(process.cwd(), 'data', 'users.csv');
 
-async function readUsers() {
+export async function readUsers() {
   try {
     const data = await fs.readFile(csvFilePath, 'utf-8');
     const lines = data.trim().split('\n');
@@ -29,6 +30,10 @@ async function readUsers() {
       headers.forEach((header, i) => {
         user[header.trim()] = values[i].trim();
       });
+      // Convert email to lowercase when reading from CSV
+      if (user.email) {
+        user.email = user.email.toLowerCase();
+      }
       return user;
     });
   } catch (error) {
@@ -97,7 +102,9 @@ export async function login(prevState: any, formData: FormData) {
 
     try {
         const users = await readUsers();
-        const user = users.find(u => u.email === email && u.password === password);
+        // Convert provided email to lowercase for case-insensitive comparison
+        const lowerCaseEmail = email.toLowerCase();
+        const user = users.find(u => u.email === lowerCaseEmail && u.password === password);
 
         if (!user) {
             return { success: false, message: 'Invalid email or password. Please try again.' };
@@ -119,7 +126,7 @@ export async function login(prevState: any, formData: FormData) {
             .setSubject(user.uid)
             .sign(secretKey);
 
-        cookies().set('session', session, { expires, httpOnly: true });
+        (await cookies()).set('session', session, { expires, httpOnly: true });
 
         return { success: true, message: 'Login successful!' };
     } catch (error: any) {
@@ -128,12 +135,35 @@ export async function login(prevState: any, formData: FormData) {
 }
 
 export async function logout() {
-  cookies().set('session', '', { expires: new Date(0) });
+  (await cookies()).set('session', '', { expires: new Date(0) });
   redirect('/login');
 }
 
+export async function updateUserRole(userId: string, newRole: string) {
+  try {
+    console.log('updateUserRole called with userId:', userId, 'and newRole:', newRole);
+    const users = await readUsers();
+    console.log('Users read from CSV:', users);
+    const userIndex = users.findIndex(user => user.uid === userId);
+
+    if (userIndex === -1) {
+      return { success: false, message: 'User not found.' };
+    }
+
+    // Update the user's role
+    users[userIndex].role = newRole;
+
+    // Write the updated users back to the CSV
+    await writeUsers(users);
+
+    return { success: true, message: 'User role updated successfully!' };
+  } catch (error: any) {
+    return { success: false, message: 'An unexpected error occurred while updating user role.' };
+  }
+}
+
 export async function getSession() {
-  const sessionCookie = cookies().get('session')?.value;
+  const sessionCookie = (await cookies()).get('session')?.value;
   if (!sessionCookie) return null;
   try {
     const { payload } = await jwtVerify(sessionCookie, secretKey, {

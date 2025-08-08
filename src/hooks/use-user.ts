@@ -22,7 +22,7 @@ const PUBLIC_AUTH_ROUTE = '/login';
 let cachedProfile: UserProfile | null = null;
 
 function getProfileFromCookie(): UserProfile | null {
-    const cookie = getCookie('session');
+    const cookie = getCookie('session') as string | undefined; // Cast to string | undefined
     if (!cookie) return null;
     try {
         const decoded: UserProfile = jwtDecode(cookie);
