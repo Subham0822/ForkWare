@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useRouter } from 'next/navigation';
@@ -90,7 +91,12 @@ export default function ProfilePage() {
             ) : (
                 <div className='text-amber-600'>
                     <p>Pending Verification.</p>
-                    {user.desiredRole && <p className='text-sm opacity-80'>Your request for the '{user.desiredRole}' role is awaiting admin approval.</p>}
+                    {user.desiredRole && (
+                      <>
+                        <p className='text-sm opacity-80'>Your request for the '{user.desiredRole}' role is awaiting admin approval.</p>
+                        <p className='text-sm opacity-80'>Please wait for an administrator to verify your request.</p>
+                      </>
+                    )}
                 </div>
             )}
           </div>
