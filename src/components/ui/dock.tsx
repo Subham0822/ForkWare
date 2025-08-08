@@ -27,7 +27,7 @@ const Dock = React.forwardRef<HTMLDivElement, DockProps>(
     {
       className,
       children,
-      magnification = 60,
+      magnification = 30,
       distance = 80,
       ...props
     },
@@ -79,7 +79,7 @@ export interface DockItemProps {
 
 const DockItem = ({
   children,
-  magnification = 60,
+  magnification = 30,
   distance = 80,
   mouseX,
   className,
