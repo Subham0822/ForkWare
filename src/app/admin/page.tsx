@@ -5,8 +5,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import React, { useState, useEffect, useActionState } from 'react';
-import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { signup } from '@/app/actions/auth';
 import { useToast } from "@/hooks/use-toast";
 
@@ -82,10 +80,6 @@ export default function AdminDashboard() {
       // For now, this will likely not display any users.
       console.warn("User fetching is not implemented for CSV storage. This list will be empty.");
       setUsers([]);
-      // const usersCollection = collection(db, 'users');
-      // const userSnapshot = await getDocs(usersCollection);
-      // const userList = userSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-      // setUsers(userList);
     } catch (error) {
       console.error("Failed to fetch users:", error);
       toast({ variant: "destructive", title: "Error", description: "Failed to fetch users." });
