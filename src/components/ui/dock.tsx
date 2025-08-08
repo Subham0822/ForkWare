@@ -79,7 +79,7 @@ export interface DockItemProps {
 
 const DockItem = ({
   children,
-  magnification = 30,
+  magnification = 15,
   distance = 80,
   mouseX,
   className,
