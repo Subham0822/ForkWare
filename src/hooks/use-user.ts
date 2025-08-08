@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { useRouter, usePathname } from 'next/navigation';
 
@@ -23,9 +23,15 @@ export function useUser() {
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
+      setLoading(true); // Start loading when auth state changes
       setUser(currentUser);
-      if (!currentUser && pathname === '/profile') {
-        router.push('/login');
+      if (!currentUser) {
+        setProfile(null);
+        setLoading(false);
+        // Only redirect if they are on a protected page and not logged in
+        if (pathname === '/profile' || pathname === '/admin' || pathname === '/canteen' || pathname === '/dashboard' || pathname === '/analytics') {
+          router.push('/login');
+        }
       }
     });
 
@@ -42,15 +48,15 @@ export function useUser() {
           setProfile(null);
         }
         setLoading(false);
-      }, () => {
+      }, (error) => {
+        console.error("Error fetching user profile:", error);
+        setProfile(null);
         setLoading(false);
       });
       
       return () => unsubscribeSnapshot();
-    } else {
-      setProfile(null);
-      setLoading(false);
     }
+    // No need for an else block, the auth listener handles the null user case
   }, [user]);
 
   return { user, profile, loading };

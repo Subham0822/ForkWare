@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useRouter } from 'next/navigation';
@@ -20,8 +21,14 @@ export default function ProfilePage() {
   }
 
   if (!user || !profile) {
-    // This will be briefly shown while redirecting if the user is not logged in.
-    return <div className="container mx-auto py-10 text-center">No profile found. Redirecting...</div>;
+    // This state should ideally not be reached if the hook's redirect works correctly
+    // It's a fallback.
+    return (
+        <div className="container mx-auto py-10 text-center">
+            <p>Could not load profile. You might not be logged in.</p>
+            <Button onClick={() => router.push('/login')} className="mt-4">Go to Login</Button>
+        </div>
+    );
   }
 
   return (
