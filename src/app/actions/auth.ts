@@ -137,18 +137,21 @@ export async function login(prevState: any, formData: FormData) {
     .setExpirationTime(expires)
     .sign(key);
 
-  cookies().set("session", session, { expires, httpOnly: true });
+  const cookieStoreForSet = await cookies();
+  cookieStoreForSet.set("session", session, { expires, httpOnly: true });
 
   return { success: true, message: "Login successful!" };
 }
 
 export async function logout() {
-  cookies().set("session", "", { expires: new Date(0) });
+  const cookieStoreForClear = await cookies();
+  cookieStoreForClear.set("session", "", { expires: new Date(0) });
   return { success: true, message: "Logged out successfully." };
 }
 
 export async function getSession() {
-  const session = cookies().get("session")?.value;
+  const cookieStore = await cookies();
+  const session = cookieStore.get("session")?.value;
   if (!session) return null;
   try {
     const { payload } = await jwtVerify(session, key, {
