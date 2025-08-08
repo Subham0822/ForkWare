@@ -13,21 +13,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { signup, login } from "@/app/actions/auth";
 import { useToast } from "@/hooks/use-toast";
 import React, { useActionState } from "react";
+import { useRouter } from "next/navigation";
 
 function LoginPageContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const role = searchParams.get("role") || "ngo";
   const isSignup = searchParams.get("signup") === "true";
   const { toast } = useToast();
 
-  const [loginState, loginAction] = useActionState(login, undefined);
-  const [signupState, signupAction] = useActionState(signup, undefined);
+  const [loginState, loginAction, isLoginPending] = useActionState(login, undefined);
+  const [signupState, signupAction, isSignupPending] = useActionState(signup, undefined);
   
-  React.useEffect(() => {
+  useEffect(() => {
     if (loginState?.message) {
       toast({
         variant: loginState.success ? "default" : "destructive",
@@ -37,20 +39,24 @@ function LoginPageContent() {
     }
   }, [loginState, toast]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (signupState?.message) {
       toast({
         variant: signupState.success ? "default" : "destructive",
         title: signupState.success ? "Success" : "Error",
         description: signupState.message,
       });
+       if (signupState.success) {
+        router.push('/login?role=' + role);
+      }
     }
-  }, [signupState, toast]);
+  }, [signupState, toast, role, router]);
 
 
   const getRoleName = (role: string) => {
     if (role === "canteen") return "Canteen / Event";
-    return "NGO / Volunteer";
+    if (role === "ngo") return "NGO / Volunteer";
+    return "Customer";
   };
 
   return (
@@ -68,7 +74,7 @@ function LoginPageContent() {
             <Card>
               <CardHeader className="space-y-1 text-center">
                 <CardTitle className="text-2xl font-headline">
-                  Login as {getRoleName(role)}
+                  Login to your Account
                 </CardTitle>
                 <CardDescription>
                   Enter your email below to login to your account
@@ -91,7 +97,9 @@ function LoginPageContent() {
                 </div>
               </CardContent>
               <CardFooter>
-                <Button className="w-full">Login</Button>
+                <Button className="w-full" disabled={isLoginPending}>
+                  {isLoginPending ? "Logging in..." : "Login"}
+                </Button>
               </CardFooter>
             </Card>
           </form>
@@ -109,11 +117,11 @@ function LoginPageContent() {
               </CardHeader>
               <CardContent className="space-y-4">
                  <div className="space-y-2">
-                  <Label htmlFor="name-signup">Organization Name</Label>
+                  <Label htmlFor="name-signup">Organization/Full Name</Label>
                   <Input
                     id="name-signup"
                     name="name"
-                    placeholder="e.g. Campus Kitchen"
+                    placeholder="e.g. Campus Kitchen or John Doe"
                     required
                   />
                 </div>
@@ -134,7 +142,9 @@ function LoginPageContent() {
                  <input type="hidden" name="role" value={getRoleName(role)} />
               </CardContent>
               <CardFooter>
-                <Button className="w-full">Create Account</Button>
+                <Button className="w-full" disabled={isSignupPending}>
+                    {isSignupPending ? "Creating Account..." : "Create Account"}
+                </Button>
               </CardFooter>
             </Card>
           </form>

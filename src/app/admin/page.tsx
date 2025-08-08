@@ -3,14 +3,20 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
+import React, { useState, useEffect } from 'react';
+import { db } from '@/lib/firebase';
+import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { FileUp } from "lucide-react";
+import { FileUp, RefreshCw } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+
 
 const surplusFormSchema = z.object({
   foodName: z.string().min(2, "Food name must be at least 2 characters."),
@@ -22,14 +28,42 @@ const surplusFormSchema = z.object({
 
 type SurplusFormValues = z.infer<typeof surplusFormSchema>;
 
-const mockUsers = [
-  { id: '1', email: 'volunteer@example.com', role: 'NGO / Volunteer' },
-  { id: '2', email: 'canteen.staff@example.com', role: 'Canteen / Event' },
-  { id: '3', email: 'admin@example.com', role: 'Admin' },
-  { id: '4', email: 'new.user@example.com', role: 'Customer' },
-];
+interface User {
+    id: string;
+    email: string;
+    role: string;
+    verified: boolean;
+}
 
 export default function AdminDashboard() {
+  const [users, setUsers] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchUsers = async () => {
+    setIsLoading(true);
+    const usersCollection = collection(db, 'users');
+    const userSnapshot = await getDocs(usersCollection);
+    const userList = userSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+    setUsers(userList);
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const handleRoleChange = async (userId: string, newRole: string) => {
+    const userRef = doc(db, 'users', userId);
+    await updateDoc(userRef, { role: newRole });
+    setUsers(users.map(user => user.id === userId ? { ...user, role: newRole } : user));
+  };
+  
+  const handleVerificationChange = async (userId: string, verified: boolean) => {
+    const userRef = doc(db, 'users', userId);
+    await updateDoc(userRef, { verified });
+    setUsers(users.map(user => user.id === userId ? { ...user, verified } : user));
+  };
+
   const form = useForm<SurplusFormValues>({
     resolver: zodResolver(surplusFormSchema),
     defaultValues: {
@@ -100,24 +134,31 @@ export default function AdminDashboard() {
         </Card>
         
         <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
                 <CardTitle className="font-headline">User Management</CardTitle>
                 <CardDescription>View and manage user roles across the platform.</CardDescription>
+              </div>
+              <Button variant="ghost" size="icon" onClick={fetchUsers} disabled={isLoading}>
+                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              </Button>
             </CardHeader>
             <CardContent>
+                {isLoading ? <p>Loading users...</p> : (
                 <Table>
                 <TableHeader>
                     <TableRow>
                     <TableHead>User Email</TableHead>
                     <TableHead className="w-[180px]">Role</TableHead>
+                    <TableHead className="text-center">Verified</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {mockUsers.map((user) => (
+                    {users.map((user) => (
                     <TableRow key={user.id}>
                         <TableCell className="font-medium">{user.email}</TableCell>
                         <TableCell>
-                            <Select defaultValue={user.role}>
+                            <Select defaultValue={user.role} onValueChange={(newRole) => handleRoleChange(user.id, newRole)}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select role" />
                                 </SelectTrigger>
@@ -129,10 +170,21 @@ export default function AdminDashboard() {
                                 </SelectContent>
                             </Select>
                         </TableCell>
+                         <TableCell className="text-center">
+                            <div className="flex items-center justify-center space-x-2">
+                                <Switch
+                                    id={`verified-switch-${user.id}`}
+                                    checked={user.verified}
+                                    onCheckedChange={(checked) => handleVerificationChange(user.id, checked)}
+                                    aria-readonly
+                                />
+                            </div>
+                        </TableCell>
                     </TableRow>
                     ))}
                 </TableBody>
                 </Table>
+                )}
             </CardContent>
         </Card>
       </div>
