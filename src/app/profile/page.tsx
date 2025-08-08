@@ -1,43 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useRouter } from 'next/navigation';
-
-interface UserProfile {
-  name: string;
-  email: string;
-  role: string;
-  verified: boolean;
-}
+import { useUser } from '@/hooks/use-user';
+import { auth } from '@/lib/firebase';
 
 export default function ProfilePage() {
   const router = useRouter();
-  const [user, setUser] = useState<FirebaseUser | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
-        const userDocRef = doc(db, 'users', currentUser.uid);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-          setProfile(userDoc.data() as UserProfile);
-        }
-      } else {
-        router.push('/login');
-      }
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [router]);
+  const { user, profile, loading } = useUser();
 
   const handleLogout = async () => {
     await auth.signOut();
@@ -48,8 +19,9 @@ export default function ProfilePage() {
     return <div className="container mx-auto py-10 text-center">Loading profile...</div>;
   }
 
-  if (!profile) {
-    return <div className="container mx-auto py-10 text-center">Could not load profile.</div>;
+  if (!user || !profile) {
+    // This will be briefly shown while redirecting if the user is not logged in.
+    return <div className="container mx-auto py-10 text-center">No profile found. Redirecting...</div>;
   }
 
   return (

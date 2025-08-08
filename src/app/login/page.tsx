@@ -41,7 +41,7 @@ function LoginPageContent() {
         description: loginState.message,
       });
     }
-  }, [loginState, toast, router]);
+  }, [loginState, router, toast]);
 
   useEffect(() => {
     if (signupState?.message) {

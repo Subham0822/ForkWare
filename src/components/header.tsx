@@ -1,16 +1,24 @@
+
+'use client';
+
 import Link from "next/link";
 import { KindPlateLogo } from "./logo";
 import { Button } from "./ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
-import { Menu } from "lucide-react";
+import { Menu, UserCircle } from "lucide-react";
+import { useUser } from "@/hooks/use-user";
 
 export function Header() {
+  const { user, profile } = useUser();
+
   const navItems = [
     { label: "Home", href: "/" },
     { label: "Canteen", href: "/canteen" },
     { label: "Volunteer", href: "/dashboard" },
     { label: "Analytics", href: "/analytics" },
   ];
+  
+  const adminNav = { label: "Admin", href: "/admin" };
 
   return (
     <header className="bg-background/80 sticky top-0 z-50 backdrop-blur-sm">
@@ -28,14 +36,33 @@ export function Header() {
               {item.label}
             </Link>
           ))}
+           {profile?.role === 'Admin' && (
+             <Link
+              href={adminNav.href}
+              className="text-sm font-medium text-foreground/70 transition-colors hover:text-foreground"
+            >
+              {adminNav.label}
+            </Link>
+           )}
         </nav>
         <div className="hidden md:flex items-center gap-2">
-          <Button variant="outline" asChild>
-            <Link href="/login">Login</Link>
-          </Button>
-          <Button asChild>
-            <Link href="/login?signup=true">Sign Up</Link>
-          </Button>
+          {user ? (
+            <Button variant="ghost" asChild>
+              <Link href="/profile" className="flex items-center gap-2">
+                <UserCircle />
+                My Profile
+              </Link>
+            </Button>
+          ) : (
+            <>
+              <Button variant="outline" asChild>
+                <Link href="/login">Login</Link>
+              </Button>
+              <Button asChild>
+                <Link href="/login?signup=true">Sign Up</Link>
+              </Button>
+            </>
+          )}
         </div>
         <div className="md:hidden">
           <Sheet>
@@ -60,14 +87,30 @@ export function Header() {
                       {item.label}
                     </Link>
                   ))}
+                  {profile?.role === 'Admin' && (
+                     <Link
+                      href={adminNav.href}
+                      className="text-lg font-medium"
+                    >
+                      {adminNav.label}
+                    </Link>
+                  )}
                 </nav>
-                <div className="flex flex-col gap-2">
-                  <Button variant="outline" asChild>
-                    <Link href="/login">Login</Link>
-                  </Button>
-                  <Button asChild>
-                    <Link href="/login?signup=true">Sign Up</Link>
-                  </Button>
+                <div className="mt-auto flex flex-col gap-2 border-t pt-6">
+                   {user ? (
+                    <Button variant="outline" asChild>
+                       <Link href="/profile">View Profile</Link>
+                    </Button>
+                  ) : (
+                    <>
+                      <Button variant="outline" asChild>
+                        <Link href="/login">Login</Link>
+                      </Button>
+                      <Button asChild>
+                        <Link href="/login?signup=true">Sign Up</Link>
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
             </SheetContent>
