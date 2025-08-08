@@ -12,12 +12,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { Suspense, useEffect, useActionState } from "react";
 import { signup, login } from "@/app/actions/auth";
 import { useToast } from "@/hooks/use-toast";
-import React, { useActionState } from "react";
-import { useRouter } from "next/navigation";
 
 function LoginPageContent() {
   const searchParams = useSearchParams();
@@ -26,14 +24,14 @@ function LoginPageContent() {
   const isSignup = searchParams.get("signup") === "true";
   const { toast } = useToast();
 
-  const [loginState, loginAction, isLoginPending] = useActionState(login, undefined);
-  const [signupState, signupAction, isSignupPending] = useActionState(signup, undefined);
+  const [loginState, loginAction, isLoginPending] = useActionState(login, null);
+  const [signupState, signupAction, isSignupPending] = useActionState(signup, null);
   
   useEffect(() => {
     if (loginState?.message) {
       toast({
         variant: loginState.success ? "default" : "destructive",
-        title: loginState.success ? "Success" : "Error",
+        title: loginState.success ? "Success" : "Login Failed",
         description: loginState.message,
       });
     }
@@ -43,21 +41,27 @@ function LoginPageContent() {
     if (signupState?.message) {
       toast({
         variant: signupState.success ? "default" : "destructive",
-        title: signupState.success ? "Success" : "Error",
+        title: signupState.success ? "Success" : "Signup Failed",
         description: signupState.message,
       });
        if (signupState.success) {
+        // To switch to the login tab after successful signup
         router.push('/login?role=' + role);
       }
     }
   }, [signupState, toast, role, router]);
 
 
-  const getRoleName = (role: string) => {
-    if (role === "canteen") return "Canteen / Event";
-    if (role === "ngo") return "NGO / Volunteer";
-    return "Customer";
+  const getRoleName = (roleKey: string) => {
+    const roles: { [key: string]: string } = {
+        canteen: "Canteen / Event",
+        ngo: "NGO / Volunteer",
+        customer: "Customer",
+    };
+    return roles[roleKey] || "Customer";
   };
+  
+  const currentRole = getRoleName(role);
 
   return (
     <div className="container mx-auto flex items-center justify-center min-h-[calc(100vh-8rem)] py-12">
@@ -97,7 +101,7 @@ function LoginPageContent() {
                 </div>
               </CardContent>
               <CardFooter>
-                <Button className="w-full" disabled={isLoginPending}>
+                <Button className="w-full" type="submit" disabled={isLoginPending}>
                   {isLoginPending ? "Logging in..." : "Login"}
                 </Button>
               </CardFooter>
@@ -109,7 +113,7 @@ function LoginPageContent() {
             <Card>
               <CardHeader className="space-y-1 text-center">
                 <CardTitle className="text-2xl font-headline">
-                  Create a {getRoleName(role)} Account
+                  Create a {currentRole} Account
                 </CardTitle>
                 <CardDescription>
                   Enter your information to create an account
@@ -139,10 +143,10 @@ function LoginPageContent() {
                   <Label htmlFor="password-signup">Password</Label>
                   <Input id="password-signup" name="password" type="password" required />
                 </div>
-                 <input type="hidden" name="role" value={getRoleName(role)} />
+                 <input type="hidden" name="role" value={currentRole} />
               </CardContent>
               <CardFooter>
-                <Button className="w-full" disabled={isSignupPending}>
+                <Button className="w-full" type="submit" disabled={isSignupPending}>
                     {isSignupPending ? "Creating Account..." : "Create Account"}
                 </Button>
               </CardFooter>
