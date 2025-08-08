@@ -1,4 +1,4 @@
-# **App Name**: KindCycle
+# **App Name**: KindPlate
 
 ## Core Features:
 
