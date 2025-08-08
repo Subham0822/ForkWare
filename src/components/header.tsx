@@ -21,17 +21,19 @@ export function Header() {
         <div className="flex flex-1 items-center justify-end space-x-2">
            <ThemeToggle />
           {user ? (
-            <Link href="/profile">
-              <Button variant="ghost" size="icon">
-                <UserCircle className="h-5 w-5" />
-              </Button>
-            </Link>
+            <Button asChild variant="ghost">
+              <Link href="/profile">
+                <UserCircle className="h-5 w-5 mr-2" />
+                Profile
+              </Link>
+            </Button>
           ) : (
-            <Link href="/login">
-              <Button variant="ghost" size="icon">
-                  <LogIn className="h-5 w-5" />
-              </Button>
-            </Link>
+            <Button asChild variant="ghost">
+              <Link href="/login">
+                 <LogIn className="h-5 w-5 mr-2" />
+                Login
+              </Link>
+            </Button>
           )}
         </div>
       </div>
