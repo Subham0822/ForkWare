@@ -3,61 +3,38 @@
 import Link from "next/link";
 import { KindPlateLogo } from "./logo";
 import { Button } from "./ui/button";
-import { Home, UserCircle, BarChart2, Utensils, Users, LogIn } from "lucide-react";
+import { UserCircle, LogIn } from "lucide-react";
 import { useUser } from "@/hooks/use-user";
 import { ThemeToggle } from "./theme-toggle";
-import { Dock, DockItem } from "./ui/dock";
 
 export function Header() {
   const { user } = useUser();
 
-  const navItems = [
-    { label: "Home", href: "/", icon: Home, tooltip: "Home" },
-    { label: "Canteen", href: "/canteen", icon: Utensils, tooltip: "Canteen" },
-    { label: "Volunteer", href: "/dashboard", icon: Users, tooltip: "Volunteer" },
-    { label: "Analytics", href: "/analytics", icon: BarChart2, tooltip: "Analytics" },
-  ];
-
   return (
-    <header className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2">
-        <Dock>
-          <DockItem tooltip="KindPlate">
-            <Link href="/">
-              <KindPlateLogo/>
-            </Link>
-          </DockItem>
-          {navItems.map((item) => (
-             <DockItem key={item.label} tooltip={item.tooltip}>
-                <Link href={item.href}>
-                  <Button variant="ghost" size="icon">
-                    <item.icon />
-                  </Button>
-                </Link>
-            </DockItem>
-          ))}
-
-          <DockItem tooltip="Theme">
-             <ThemeToggle />
-          </DockItem>
-
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container flex h-14 items-center">
+        <div className="mr-4 flex">
+          <Link href="/" className="mr-6 flex items-center space-x-2">
+            <KindPlateLogo />
+          </Link>
+        </div>
+        <div className="flex flex-1 items-center justify-end space-x-2">
+           <ThemeToggle />
           {user ? (
-              <DockItem tooltip="My Profile">
-                <Link href="/profile">
-                  <Button variant="ghost" size="icon">
-                    <UserCircle />
-                  </Button>
-                </Link>
-              </DockItem>
-            ) : (
-              <DockItem tooltip="Login">
-                <Link href="/login">
-                  <Button variant="ghost" size="icon">
-                      <LogIn />
-                  </Button>
-                </Link>
-              </DockItem>
-            )}
-        </Dock>
+            <Link href="/profile">
+              <Button variant="ghost" size="icon">
+                <UserCircle className="h-5 w-5" />
+              </Button>
+            </Link>
+          ) : (
+            <Link href="/login">
+              <Button variant="ghost" size="icon">
+                  <LogIn className="h-5 w-5" />
+              </Button>
+            </Link>
+          )}
+        </div>
+      </div>
     </header>
   );
 }
