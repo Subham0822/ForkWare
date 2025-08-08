@@ -14,6 +14,7 @@ interface UserPayload {
   email: string;
   role: string;
   verified: boolean;
+  desiredRole?: string;
   [key: string]: any; // Add this index signature
 }
 
@@ -23,21 +24,20 @@ export async function readUsers() {
   try {
     const data = await fs.readFile(csvFilePath, 'utf-8');
     const lines = data.trim().split('\n');
+    if (lines.length <= 1) return []; // Handle empty or header-only file
     const headers = lines[0].split(',');
     return lines.slice(1).map(line => {
       const values = line.split(',');
       const user: any = {};
       headers.forEach((header, i) => {
-        user[header.trim()] = values[i].trim();
+        user[header.trim()] = values[i] ? values[i].trim() : ''; // Handle empty values
       });
-      // Convert email to lowercase when reading from CSV
       if (user.email) {
         user.email = user.email.toLowerCase();
       }
       return user;
     });
   } catch (error) {
-    // If the file doesn't exist, return an empty array
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       return [];
     }
@@ -46,6 +46,14 @@ export async function readUsers() {
 }
 
 async function writeUsers(users: any[]) {
+  if (users.length === 0) {
+      // If there are no users, we can choose to write an empty file or a file with only headers.
+      // Writing headers is generally better to maintain file structure.
+      const headers = ['uid', 'name', 'email', 'password', 'role', 'verified', 'desiredRole'];
+      await fs.mkdir(path.dirname(csvFilePath), { recursive: true });
+      await fs.writeFile(csvFilePath, headers.join(','), 'utf-8');
+      return;
+  }
   const headers = Object.keys(users[0]).join(',');
   const rows = users.map(user => Object.values(user).join(','));
   const csvContent = `${headers}\n${rows.join('\n')}`;
@@ -78,16 +86,21 @@ export async function signup(prevState: any, formData: FormData) {
       password, // In a real app, you MUST hash passwords
       role,
       verified: role === 'Customer' ? 'true' : 'false',
+      desiredRole: '',
     };
 
     users.push(newUser);
-    if(users.length === 1) { // First user, write headers
-        const headers = Object.keys(newUser).join(',');
-        const row = Object.values(newUser).join(',');
-        await fs.mkdir(path.dirname(csvFilePath), { recursive: true });
-        await fs.writeFile(csvFilePath, `${headers}\n${row}`, 'utf-8');
+
+    const headers = Object.keys(newUser).join(',');
+    const rows = users.map(user => Object.values(user).join(','));
+    const csvContent = `${headers}\n${rows.join('\n')}`;
+    
+    await fs.mkdir(path.dirname(csvFilePath), { recursive: true });
+    
+    if (users.length === 1 && !await fs.access(csvFilePath).then(() => true).catch(() => false)) {
+        await fs.writeFile(csvFilePath, csvContent, 'utf-8');
     } else {
-        await fs.appendFile(csvFilePath, `\n${Object.values(newUser).join(',')}`, 'utf-8');
+        await fs.writeFile(csvFilePath, csvContent, 'utf-8');
     }
     
     return { success: true, message: 'Account created successfully! Please login.' };
@@ -102,7 +115,6 @@ export async function login(prevState: any, formData: FormData) {
 
     try {
         const users = await readUsers();
-        // Convert provided email to lowercase for case-insensitive comparison
         const lowerCaseEmail = email.toLowerCase();
         const user = users.find(u => u.email === lowerCaseEmail && u.password === password);
 
@@ -116,6 +128,7 @@ export async function login(prevState: any, formData: FormData) {
             email: user.email,
             role: user.role,
             verified: user.verified === 'true',
+            desiredRole: user.desiredRole || '',
         };
 
         const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
@@ -126,7 +139,7 @@ export async function login(prevState: any, formData: FormData) {
             .setSubject(user.uid)
             .sign(secretKey);
 
-        (await cookies()).set('session', session, { expires, httpOnly: true });
+        cookies().set('session', session, { expires, httpOnly: true });
 
         return { success: true, message: 'Login successful!' };
     } catch (error: any) {
@@ -135,25 +148,23 @@ export async function login(prevState: any, formData: FormData) {
 }
 
 export async function logout() {
-  (await cookies()).set('session', '', { expires: new Date(0) });
+  cookies().set('session', '', { expires: new Date(0) });
   redirect('/login');
 }
 
 export async function updateUserRole(userId: string, newRole: string) {
   try {
-    console.log('updateUserRole called with userId:', userId, 'and newRole:', newRole);
     const users = await readUsers();
-    console.log('Users read from CSV:', users);
     const userIndex = users.findIndex(user => user.uid === userId);
 
     if (userIndex === -1) {
       return { success: false, message: 'User not found.' };
     }
 
-    // Update the user's role
     users[userIndex].role = newRole;
+    users[userIndex].verified = 'true'; // Approving a role change also verifies them.
+    users[userIndex].desiredRole = ''; // Clear the desired role upon approval.
 
-    // Write the updated users back to the CSV
     await writeUsers(users);
 
     return { success: true, message: 'User role updated successfully!' };
@@ -162,8 +173,29 @@ export async function updateUserRole(userId: string, newRole: string) {
   }
 }
 
+export async function requestRoleChange(userId: string, newRole: string) {
+    try {
+        const users = await readUsers();
+        const userIndex = users.findIndex(user => user.uid === userId);
+
+        if (userIndex === -1) {
+            return { success: false, message: 'User not found.' };
+        }
+
+        users[userIndex].desiredRole = newRole;
+
+        await writeUsers(users);
+
+        return { success: true, message: 'Role change requested successfully!' };
+    } catch (error: any) {
+        console.error("Error requesting role change:", error);
+        return { success: false, message: 'An unexpected error occurred while requesting the role change.' };
+    }
+}
+
+
 export async function getSession() {
-  const sessionCookie = (await cookies()).get('session')?.value;
+  const sessionCookie = cookies().get('session')?.value;
   if (!sessionCookie) return null;
   try {
     const { payload } = await jwtVerify(sessionCookie, secretKey, {

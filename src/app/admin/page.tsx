@@ -12,11 +12,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { FileUp, RefreshCw, UserPlus } from "lucide-react";
+import { FileUp, RefreshCw, UserPlus, HelpCircle } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
 
 const surplusFormSchema = z.object({
   foodName: z.string().min(2, "Food name must be at least 2 characters."),
@@ -42,6 +44,7 @@ interface User {
     email: string;
     role: string;
     verified: boolean;
+    desiredRole?: string;
 }
 
 export default function AdminDashboard() {
@@ -98,7 +101,7 @@ export default function AdminDashboard() {
       });
       setIsAddUserDialogOpen(false);
       addUserForm.reset();
-      fetchUsers(); // Refresh the user list
+      fetchUsers();
     } else if (signupState?.success === false) {
       toast({
         variant: "destructive",
@@ -114,7 +117,7 @@ export default function AdminDashboard() {
       const result = await updateUserRole(userId, newRole);
       if (result.success) {
         toast({ title: "Success", description: result.message });
-        await fetchUsers(); // Refresh the user list after successful update
+        await fetchUsers();
       } else {
         toast({ variant: "destructive", title: "Error", description: result.message });
       }
@@ -125,13 +128,11 @@ export default function AdminDashboard() {
   };
   
   const handleVerificationChange = async (userId: string, verified: boolean) => {
-    // This functionality is complex with a CSV file and would require a dedicated server action.
     toast({ variant: "destructive", title: "Not Implemented", description: "Changing verification is not supported with CSV storage."});
   };
 
   function onSurplusSubmit(data: SurplusFormValues) {
     console.log(data);
-    // Here you would handle form submission to your backend
   }
 
   return (
@@ -206,11 +207,13 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent>
                 {isLoading ? <p>Loading users...</p> : (
-                  users.length === 0 ? <p>User list is unavailable with CSV storage.</p> :
+                  users.length === 0 ? <p>No users found.</p> :
+                <TooltipProvider>
                 <Table>
                 <TableHeader>
                     <TableRow>
                     <TableHead>User Email</TableHead>
+                    <TableHead>Requested Role</TableHead>
                     <TableHead className="w-[180px]">Role</TableHead>
                     <TableHead className="text-center">Verified</TableHead>
                     </TableRow>
@@ -219,6 +222,23 @@ export default function AdminDashboard() {
                     {users.map((user) => (
                       <TableRow key={user.uid}>
                         <TableCell className="font-medium">{user.email}</TableCell>
+                        <TableCell>
+                          {user.desiredRole ? (
+                            <div className="flex items-center gap-2">
+                              <span>{user.desiredRole}</span>
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>User requested this role change.</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">N/A</span>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Select defaultValue={user.role} onValueChange={(newRole) => handleRoleChange(user.uid, newRole)}>
                             <SelectTrigger>
@@ -246,6 +266,7 @@ export default function AdminDashboard() {
                     ))}
                 </TableBody>
                 </Table>
+                </TooltipProvider>
                 )}
             </CardContent>
         </Card>
@@ -286,7 +307,7 @@ export default function AdminDashboard() {
                     <FormField control={addUserForm.control} name="role" render={({ field }) => (
                         <FormItem>
                             <FormLabel>Role</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value} name="role">
+                             <Select onValueChange={field.onChange} defaultValue={field.value}>
                                 <FormControl>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select a role" />
@@ -303,11 +324,20 @@ export default function AdminDashboard() {
                         </FormItem>
                     )} />
                 </div>
+                 <input type="hidden" name="role" value={addUserForm.getValues("role")} />
                 <DialogFooter>
                     <DialogClose asChild>
                         <Button type="button" variant="secondary">Cancel</Button>
                     </DialogClose>
-                    <Button type="submit" disabled={isSignupPending}>
+                    <Button type="submit" disabled={isSignupPending} onClick={() => {
+                        const formValues = addUserForm.getValues();
+                        const formData = new FormData();
+                        formData.append('name', formValues.name);
+                        formData.append('email', formValues.email);
+                        formData.append('password', formValues.password);
+                        formData.append('role', formValues.role);
+                        signupAction(formData);
+                    }}>
                         {isSignupPending ? "Creating User..." : "Create User"}
                     </Button>
                 </DialogFooter>

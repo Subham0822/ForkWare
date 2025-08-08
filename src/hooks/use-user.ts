@@ -13,6 +13,7 @@ interface UserProfile {
   email: string;
   role: string;
   verified: boolean;
+  desiredRole?: string;
 }
 
 const PROTECTED_ROUTES = ['/profile', '/admin', '/canteen', '/dashboard', '/analytics'];
@@ -22,7 +23,7 @@ const PUBLIC_AUTH_ROUTE = '/login';
 let cachedProfile: UserProfile | null = null;
 
 function getProfileFromCookie(): UserProfile | null {
-    const cookie = getCookie('session') as string | undefined; // Cast to string | undefined
+    const cookie = getCookie('session') as string | undefined;
     if (!cookie) return null;
     try {
         const decoded: UserProfile = jwtDecode(cookie);
@@ -58,10 +59,13 @@ export function useUser() {
   }, []);
 
   useEffect(() => {
+    // This effect needs to run whenever the component mounts or the path changes,
+    // to ensure the session is always fresh.
     checkSession();
-  }, [pathname, checkSession]); // Re-check session on path change
+  }, [pathname, checkSession]); // Re-check session on mount and path change
 
   useEffect(() => {
+    // This effect handles redirection logic after the session check is complete.
     if (!loading) {
       const isProtectedRoute = PROTECTED_ROUTES.some(route => pathname.startsWith(route));
       if (!profile && isProtectedRoute) {
@@ -70,7 +74,7 @@ export function useUser() {
     }
   }, [profile, loading, pathname, router]);
 
-  // This is a simple way to sync state across tabs
+  // This is a simple way to sync logout state across tabs
   useEffect(() => {
       const syncLogout = (event: StorageEvent) => {
         if (event.key === 'logout-event') {
