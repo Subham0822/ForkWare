@@ -21,6 +21,13 @@ export interface FoodListing {
   status: "available" | "picked_up" | "expired";
   image_url?: string;
   created_at: string;
+  // Food Safety Fields
+  temperature?: string;
+  allergens?: string[];
+  preparation_method?: string;
+  safety_rating?: number; // 1-5 scale
+  storage_conditions?: string;
+  last_inspection?: string;
 }
 
 // User management functions
@@ -91,13 +98,20 @@ export async function getAllUsers() {
 export async function createFoodListing(
   listingData: Omit<FoodListing, "id" | "created_at">
 ) {
+  console.log("createFoodListing called with:", listingData);
+
   const { data, error } = await supabase
     .from("food_listings")
     .insert([listingData])
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error("Supabase error in createFoodListing:", error);
+    throw error;
+  }
+
+  console.log("createFoodListing successful:", data);
   return data;
 }
 
@@ -135,4 +149,10 @@ export async function updateFoodListing(
 
   if (error) throw error;
   return data;
+}
+
+export async function deleteFoodListing(id: string) {
+  const { error } = await supabase.from("food_listings").delete().eq("id", id);
+
+  if (error) throw error;
 }

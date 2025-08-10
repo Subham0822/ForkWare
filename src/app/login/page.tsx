@@ -22,8 +22,9 @@ import { Eye, EyeOff } from "lucide-react";
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const role = searchParams.get("role") || "customer"; // Default to customer
+  const role = searchParams.get("role") || "students"; // Default to students
   const isSignup = searchParams.get("signup") === "true";
+  const redirect = searchParams.get("redirect"); // Get redirect URL if provided
   const { toast } = useToast();
   const { user, loading, mutate } = useUser();
   const [showLoginPassword, setShowLoginPassword] = useState(false);
@@ -40,17 +41,21 @@ function LoginPageContent() {
     if (!loading && user) {
       // Add a small delay to prevent immediate redirects
       const timer = setTimeout(() => {
-        router.push("/profile");
+        // Redirect to the intended page if available, otherwise to profile
+        const targetPath = redirect || "/profile";
+        router.push(targetPath);
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, redirect]);
 
   useEffect(() => {
     if (loginState?.success) {
       toast({
         title: "Login Successful",
-        description: "Redirecting to your profile...",
+        description: redirect
+          ? "Redirecting to requested page..."
+          : "Redirecting to your profile...",
       });
       console.log("Login successful, calling mutate...");
       mutate(); // Re-fetch user session
@@ -60,7 +65,8 @@ function LoginPageContent() {
 
       // Add a small delay before redirect to allow mutate to complete
       setTimeout(() => {
-        router.push("/profile");
+        const targetPath = redirect || "/profile";
+        router.push(targetPath);
       }, 200);
     } else if (loginState?.success === false) {
       toast({
@@ -69,7 +75,7 @@ function LoginPageContent() {
         description: loginState.message,
       });
     }
-  }, [loginState, router, toast, mutate]);
+  }, [loginState, router, toast, mutate, redirect]);
 
   useEffect(() => {
     if (signupState?.success) {
@@ -92,12 +98,13 @@ function LoginPageContent() {
   }, [signupState, toast, role, router]);
 
   const getRoleName = (roleKey: string) => {
-    const roles: { [key: string]: string } = {
+    const roles: Record<string, string> = {
+      admin: "Admin",
       canteen: "Canteen / Event",
       ngo: "NGO / Volunteer",
-      customer: "Customer",
+      students: "Students",
     };
-    return roles[roleKey] || "Customer";
+    return roles[roleKey] || "Students";
   };
 
   const currentRole = getRoleName(role);
@@ -114,6 +121,13 @@ function LoginPageContent() {
 
   return (
     <div className="container mx-auto flex items-center justify-center min-h-[calc(100vh-8rem)] py-12">
+      {redirect && (
+        <div className="absolute top-20 left-1/2 transform -translate-x-1/2">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 text-blue-800 text-sm">
+            🔒 You need to login first to access this section
+          </div>
+        </div>
+      )}
       <Tabs
         defaultValue={isSignup ? "signup" : "login"}
         className="w-full max-w-md"
@@ -135,7 +149,9 @@ function LoginPageContent() {
                   Login to your Account
                 </CardTitle>
                 <CardDescription>
-                  Enter your email below to login to your account
+                  {redirect
+                    ? "Please login to access the requested section"
+                    : "Enter your email below to login to your account"}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">

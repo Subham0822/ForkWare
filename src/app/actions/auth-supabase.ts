@@ -39,7 +39,7 @@ export async function signup(prevState: any, formData: FormData) {
         name,
         email,
         role,
-        verified: role === "Customer",
+        verified: role === "Students",
         desired_role: "",
       });
 
@@ -83,7 +83,7 @@ export async function login(prevState: any, formData: FormData) {
               id: authData.user.id,
               name: email.split("@")[0], // Use email prefix as name
               email: email,
-              role: "Customer",
+              role: "Students",
               verified: true,
               desired_role: "",
             });

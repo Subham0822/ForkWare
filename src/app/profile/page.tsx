@@ -22,11 +22,22 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { FormEvent, useEffect } from "react";
+import { AuthGuard } from "@/components/auth-guard";
 
 export default function ProfilePage() {
   const router = useRouter();
   const { user, loading, mutate } = useUser();
   const { toast } = useToast();
+
+  // Handle redirect if user is not authenticated
+  useEffect(() => {
+    if (!loading && !user) {
+      const timer = setTimeout(() => {
+        router.push("/login");
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [user, loading, router]);
 
   const handleLogout = async () => {
     await logout();
@@ -85,13 +96,6 @@ export default function ProfilePage() {
   }
 
   if (!user) {
-    // Redirect to login if not authenticated
-    useEffect(() => {
-      const timer = setTimeout(() => {
-        router.push("/login");
-      }, 100);
-      return () => clearTimeout(timer);
-    }, [router]);
     return (
       <div className="container mx-auto py-10 text-center">
         Redirecting to login...
@@ -100,102 +104,108 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="container mx-auto py-10 px-4 md:px-6 flex items-center justify-center min-h-[calc(100vh-8rem)]">
-      <Card className="w-full max-w-2xl">
-        <CardHeader>
-          <CardTitle className="text-3xl font-headline">My Profile</CardTitle>
-          <CardDescription>Your personal and role information.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <h3 className="font-semibold">Name</h3>
-              <p>{user.name}</p>
-            </div>
-            <div>
-              <h3 className="font-semibold">Email</h3>
-              <p>{user.email}</p>
-            </div>
-          </div>
-          <div>
-            <h3 className="font-semibold">Current Role</h3>
-            <p>{user.role}</p>
-          </div>
-          <div>
-            <h3 className="font-semibold">Verification Status</h3>
-            {user.verified ? (
-              <p className="text-green-600">Verified</p>
-            ) : (
-              <div className="text-amber-600">
-                <p>Pending Verification.</p>
-                {user.desiredRole && (
-                  <>
-                    <p className="text-sm opacity-80">
-                      Your request for the '{user.desiredRole}' role is awaiting
-                      admin approval.
-                    </p>
-                    <p className="text-sm opacity-80">
-                      Please wait for an administrator to verify your request.
-                    </p>
-                  </>
-                )}
+    <AuthGuard>
+      <div className="container mx-auto py-10 px-4 md:px-6 flex items-center justify-center min-h-[calc(100vh-8rem)]">
+        <Card className="w-full max-w-2xl">
+          <CardHeader>
+            <CardTitle className="text-3xl font-headline">My Profile</CardTitle>
+            <CardDescription>
+              Your personal and role information.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <h3 className="font-semibold">Name</h3>
+                <p>{user.name}</p>
               </div>
-            )}
-          </div>
-
-          {user.role === "Customer" && (
-            <form onSubmit={handleRoleRequest}>
-              <Card className="bg-muted/50">
-                <CardHeader>
-                  <CardTitle className="text-xl">Request Role Change</CardTitle>
-                  <CardDescription>
-                    Want to become a food donor or a volunteer? Request a role
-                    change here. An administrator will review your request.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <Label htmlFor="role">Request New Role</Label>
-                    <Select name="role" required>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a new role to request" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Canteen / Event">
-                          Canteen / Event (Food Donor)
-                        </SelectItem>
-                        <SelectItem value="NGO / Volunteer">
-                          NGO / Volunteer (Food Recipient)
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {user.desiredRole && (
-                      <p className="text-sm text-muted-foreground pt-2">
-                        Current pending request:{" "}
-                        <span className="font-medium opacity-70">
-                          {user.desiredRole}
-                        </span>
+              <div>
+                <h3 className="font-semibold">Email</h3>
+                <p>{user.email}</p>
+              </div>
+            </div>
+            <div>
+              <h3 className="font-semibold">Current Role</h3>
+              <p>{user.role}</p>
+            </div>
+            <div>
+              <h3 className="font-semibold">Verification Status</h3>
+              {user.verified ? (
+                <p className="text-green-600">Verified</p>
+              ) : (
+                <div className="text-amber-600">
+                  <p>Pending Verification.</p>
+                  {user.desiredRole && (
+                    <>
+                      <p className="text-sm opacity-80">
+                        Your request for the '{user.desiredRole}' role is
+                        awaiting admin approval.
                       </p>
-                    )}
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button type="submit" disabled={!!user.desiredRole}>
-                    {user.desiredRole ? "Request Pending" : "Submit Request"}
-                  </Button>
-                </CardFooter>
-              </Card>
+                      <p className="text-sm opacity-80">
+                        Please wait for an administrator to verify your request.
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {user.role === "Students" && (
+              <form onSubmit={handleRoleRequest}>
+                <Card className="bg-muted/50">
+                  <CardHeader>
+                    <CardTitle className="text-xl">
+                      Request Role Change
+                    </CardTitle>
+                    <CardDescription>
+                      Want to become a food donor or a volunteer? Request a role
+                      change here. An administrator will review your request.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <Label htmlFor="role">Request New Role</Label>
+                      <Select name="role" required>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a new role to request" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Canteen / Event">
+                            Canteen / Event (Food Donor)
+                          </SelectItem>
+                          <SelectItem value="NGO / Volunteer">
+                            NGO / Volunteer (Food Recipient)
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {user.desiredRole && (
+                        <p className="text-sm text-muted-foreground pt-2">
+                          Current pending request:{" "}
+                          <span className="font-medium opacity-70">
+                            {user.desiredRole}
+                          </span>
+                        </p>
+                      )}
+                    </div>
+                  </CardContent>
+                  <CardFooter>
+                    <Button type="submit" disabled={!!user.desiredRole}>
+                      {user.desiredRole ? "Request Pending" : "Submit Request"}
+                    </Button>
+                  </CardFooter>
+                </Card>
+              </form>
+            )}
+          </CardContent>
+          <CardFooter>
+            <form action={handleLogout} className="w-full">
+              <Button type="submit" className="w-full" variant="outline">
+                Logout
+              </Button>
             </form>
-          )}
-        </CardContent>
-        <CardFooter>
-          <form action={handleLogout} className="w-full">
-            <Button type="submit" className="w-full" variant="outline">
-              Logout
-            </Button>
-          </form>
-        </CardFooter>
-      </Card>
-    </div>
+          </CardFooter>
+        </Card>
+      </div>
+    </AuthGuard>
   );
 }

@@ -108,7 +108,7 @@ export async function signup(prevState: any, formData: FormData) {
     email,
     password, // In a real app, hash this!
     role,
-    verified: role === "Customer",
+    verified: role === "Students",
     desiredRole: "",
   };
 

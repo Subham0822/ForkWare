@@ -1,45 +1,44 @@
 "use client";
 
-import { cn } from "@/lib/utils";
-import { AnimatePresence, motion } from "framer-motion";
-import React, { ReactNode } from "react";
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface AnimatedListProps {
+  children: React.ReactNode;
   className?: string;
-  children: ReactNode;
-  delay?: number;
+  staggerDelay?: number;
+  animationDuration?: number;
 }
 
-export const AnimatedList = ({
-  className,
+export function AnimatedList({
   children,
-  delay = 0,
-}: AnimatedListProps) => {
-  const childrenArray = React.Children.toArray(children);
+  className = "",
+  staggerDelay = 0.1,
+  animationDuration = 0.3,
+}: AnimatedListProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return <div className={className}>{children}</div>;
+  }
 
   return (
-    <div className={cn("relative", className)}>
+    <div className={className}>
       <AnimatePresence>
-        {childrenArray.map((child, i) => (
+        {React.Children.map(children, (child, index) => (
           <motion.div
-            key={i}
+            key={index}
             initial={{ opacity: 0, y: 20 }}
-            animate={{
-              opacity: 1,
-              y: 0,
-              transition: {
-                delay: delay + i * 0.05,
-                duration: 0.3,
-                ease: "easeOut",
-              },
-            }}
-            exit={{
-              opacity: 0,
-              y: -20,
-              transition: {
-                duration: 0.3,
-                ease: "easeIn",
-              },
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{
+              duration: animationDuration,
+              delay: index * staggerDelay,
+              ease: "easeOut",
             }}
           >
             {child}
@@ -48,4 +47,4 @@ export const AnimatedList = ({
       </AnimatePresence>
     </div>
   );
-};
+}

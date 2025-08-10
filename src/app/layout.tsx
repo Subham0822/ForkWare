@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "./nprogress.css";
 import { Header } from "@/components/header";
+import { MobileNavbar } from "@/components/mobile-navbar";
 import { Footer } from "@/components/footer";
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "@/components/theme-provider";
 import { PageLoader } from "@/components/page-loader";
 import { Suspense } from "react";
+import { FoodListingsProvider } from "@/lib/food-listings-context";
 // import { DockNavigation } from "@/components/dock-navigation";
 
 export const metadata: Metadata = {
@@ -43,10 +45,13 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <Header />
-          <main className="flex-grow">{children}</main>
-          <Footer />
-          <Toaster />
+          <FoodListingsProvider>
+            <Header />
+            <MobileNavbar />
+            <main className="flex-grow">{children}</main>
+            <Footer />
+            <Toaster />
+          </FoodListingsProvider>
         </ThemeProvider>
       </body>
     </html>
