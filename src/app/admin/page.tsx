@@ -472,11 +472,11 @@ export default function AdminDashboard() {
             color="hsl(var(--primary))"
           />
           <ScrollStack className="mb-8">
-            <h1 className="text-3xl font-headline font-bold">
+            <h1 className="text-4xl md:text-5xl font-headline font-bold gradient-text">
               <TypeAnimation
                 text="Admin Dashboard"
                 speed={100}
-                className="text-primary"
+                className="gradient-text"
                 cursorClassName="text-accent"
               />
             </h1>
@@ -489,7 +489,7 @@ export default function AdminDashboard() {
                     <CardTitle className="font-headline">
                       User Management
                     </CardTitle>
-                    <CardDescription>
+                    <CardDescription className="text-foreground">
                       Manage users, approve role changes, and verify accounts.
                     </CardDescription>
                   </div>
@@ -544,7 +544,7 @@ export default function AdminDashboard() {
                                       {user.name}
                                     </span>
                                   </div>
-                                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                  <div className="flex items-center gap-2 text-sm text-foreground">
                                     <Mail className="h-3 w-3" />
                                     <span>{user.email}</span>
                                   </div>
@@ -578,7 +578,7 @@ export default function AdminDashboard() {
                                   </Select>
                                   {user.desired_role && (
                                     <div className="flex items-center gap-1">
-                                      <span className="text-xs text-muted-foreground">
+                                      <span className="text-xs text-foreground">
                                         Requested:
                                       </span>
                                       <Badge
@@ -589,7 +589,7 @@ export default function AdminDashboard() {
                                       </Badge>
                                       <Tooltip>
                                         <TooltipTrigger>
-                                          <HelpCircle className="h-3 w-3 text-muted-foreground" />
+                                          <HelpCircle className="h-3 w-3 text-foreground/70" />
                                         </TooltipTrigger>
                                         <TooltipContent>
                                           <p>
@@ -620,7 +620,7 @@ export default function AdminDashboard() {
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                <div className="flex items-center gap-1 text-sm text-foreground">
                                   <Calendar className="h-3 w-3" />
                                   <span>{formatDate(user.created_at)}</span>
                                 </div>
@@ -651,7 +651,7 @@ export default function AdminDashboard() {
                   <CardTitle className="font-headline">
                     Food Listings Management
                   </CardTitle>
-                  <CardDescription>
+                  <CardDescription className="text-foreground">
                     Manage all surplus food listings and their status.
                     {searchQuery ||
                     sortConfig.key !== "name" ||
@@ -715,7 +715,7 @@ export default function AdminDashboard() {
                       <span className="ml-2">Loading food listings...</span>
                     </div>
                   ) : sortedListings.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
+                    <div className="text-center py-8 text-foreground">
                       {searchQuery || safetyFilter !== "all"
                         ? `No food items found matching your filters`
                         : "No food listings available"}
@@ -827,7 +827,7 @@ export default function AdminDashboard() {
                                     storageConditions={item.storageConditions}
                                   />
                                 ) : (
-                                  <span className="text-muted-foreground italic text-sm">
+                                  <span className="text-foreground/70 italic text-sm">
                                     No safety data
                                   </span>
                                 )}
@@ -906,7 +906,7 @@ export default function AdminDashboard() {
             <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
                 <DialogTitle>Add New User</DialogTitle>
-                <DialogDescription>
+                <DialogDescription className="text-foreground">
                   Create a new user account and assign them a role.
                 </DialogDescription>
               </DialogHeader>
@@ -986,7 +986,7 @@ export default function AdminDashboard() {
             <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
                 <DialogTitle>Delete User</DialogTitle>
-                <DialogDescription>
+                <DialogDescription className="text-foreground">
                   Are you sure you want to delete{" "}
                   <span className="font-semibold">{userToDelete?.name}</span>?
                   This action cannot be undone.
@@ -1017,7 +1017,7 @@ export default function AdminDashboard() {
             <DialogContent className="sm:max-w-[500px]">
               <DialogHeader>
                 <DialogTitle>Food Item Details</DialogTitle>
-                <DialogDescription>
+                <DialogDescription className="text-foreground">
                   View detailed information about this food listing.
                 </DialogDescription>
               </DialogHeader>
@@ -1025,19 +1025,19 @@ export default function AdminDashboard() {
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-sm font-medium text-muted-foreground">
+                      <label className="text-sm font-medium text-foreground">
                         Food Name
                       </label>
                       <p className="text-sm">{selectedFoodItem.name}</p>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-muted-foreground">
+                      <label className="text-sm font-medium text-foreground">
                         Quantity
                       </label>
                       <p className="text-sm">{selectedFoodItem.quantity}</p>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-muted-foreground">
+                      <label className="text-sm font-medium text-foreground">
                         Status
                       </label>
                       <Badge variant={getBadgeVariant(selectedFoodItem.status)}>
@@ -1045,13 +1045,13 @@ export default function AdminDashboard() {
                       </Badge>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-muted-foreground">
+                      <label className="text-sm font-medium text-foreground">
                         Expires
                       </label>
                       <p className="text-sm">{selectedFoodItem.expires}</p>
                     </div>
                     <div className="col-span-2">
-                      <label className="text-sm font-medium text-muted-foreground">
+                      <label className="text-sm font-medium text-foreground">
                         Pickup Location
                       </label>
                       <p className="text-sm">
@@ -1060,7 +1060,7 @@ export default function AdminDashboard() {
                     </div>
                     {selectedFoodItem.createdAt && (
                       <div className="col-span-2">
-                        <label className="text-sm font-medium text-muted-foreground">
+                        <label className="text-sm font-medium text-foreground">
                           Created At
                         </label>
                         <p className="text-sm">
@@ -1089,7 +1089,7 @@ export default function AdminDashboard() {
             <DialogContent className="sm:max-w-[500px]">
               <DialogHeader>
                 <DialogTitle>Edit Food Item</DialogTitle>
-                <DialogDescription>
+                <DialogDescription className="text-foreground">
                   Update the details of this food listing.
                 </DialogDescription>
               </DialogHeader>
@@ -1191,7 +1191,7 @@ export default function AdminDashboard() {
             <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
                 <DialogTitle>Delete Food Item</DialogTitle>
-                <DialogDescription>
+                <DialogDescription className="text-foreground">
                   Are you sure you want to delete{" "}
                   <span className="font-semibold">
                     {selectedFoodItem?.name}

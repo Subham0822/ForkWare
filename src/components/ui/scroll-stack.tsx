@@ -22,7 +22,10 @@ export function ScrollStack({
   });
 
   const y = useTransform(scrollYProgress, [0, 1], [offset, -offset]);
-  const opacity = useTransform(scrollYProgress, [0, 0.5, 1], [0, 1, 0]);
+  // Fade in as the section enters, then keep it fully visible (no fade-out on leave)
+  const opacity = useTransform(scrollYProgress, [0, 0.3], [0, 1], {
+    clamp: true,
+  });
 
   useEffect(() => {
     setMounted(true);

@@ -17,6 +17,8 @@ export function Header() {
   const handleLogout = async () => {
     const result = await logout();
     if (result.success) {
+      // Dispatch logout event to update useUser hook state
+      window.dispatchEvent(new Event("logout"));
       router.push("/login");
     }
   };
@@ -78,31 +80,18 @@ export function Header() {
         </div>
         <nav className="flex items-center space-x-6 text-sm font-medium">
           {navItems.map((item) => {
-            // Hide navigation items based on role
+            // Hide navigation items that require authentication when no user is logged in
+            if (item.requiresAuth && !user) {
+              return null;
+            }
+
+            // Hide navigation items based on role when user is logged in
             if (
               item.allowedRoles &&
               user &&
               !item.allowedRoles.includes(user.role)
             ) {
               return null;
-            }
-
-            // Hide Profile button when not authenticated
-            if (item.name === "Profile" && !user) {
-              return null;
-            }
-
-            if (item.requiresAuth && !user) {
-              return (
-                <button
-                  key={item.name}
-                  onClick={() => handleNavigation(item)}
-                  className="relative px-3 py-2 text-muted-foreground hover:text-foreground transition-all duration-300 group"
-                >
-                  {item.name}
-                  <span className="absolute inset-x-0 bottom-0 h-0.5 bg-gradient-primary transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></span>
-                </button>
-              );
             }
 
             return (

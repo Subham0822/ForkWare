@@ -405,7 +405,7 @@ export default function CanteenDashboard() {
                     cursorClassName="text-accent"
                   />
                 </h1>
-                <p className="text-xl text-muted-foreground mt-2">
+                <p className="text-xl text-foreground mt-2">
                   Manage your surplus food listings and track pickups
                 </p>
               </div>
@@ -423,7 +423,7 @@ export default function CanteenDashboard() {
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
               <div
-                className="glass-card text-center group hover:scale-105 transition-all duration-300 animate-fade-in-up"
+                className="bg-card text-center group hover:scale-105 transition-all duration-300 animate-fade-in-up border border-border rounded-xl p-6 shadow-lg"
                 style={{ animationDelay: "0.1s" }}
               >
                 <div className="mx-auto w-16 h-16 bg-gradient-primary rounded-full flex items-center justify-center mb-4 shadow-lg group-hover:shadow-xl transition-all duration-300">
@@ -432,14 +432,14 @@ export default function CanteenDashboard() {
                 <div className="text-2xl font-bold font-headline mb-2">
                   {stats.totalListings}
                 </div>
-                <div className="text-sm text-muted-foreground mb-1">
+                <div className="text-sm text-foreground mb-1">
                   Total Listings
                 </div>
                 <div className="text-xs text-primary font-medium">All time</div>
               </div>
 
               <div
-                className="glass-card text-center group hover:scale-105 transition-all duration-300 animate-fade-in-up"
+                className="bg-card text-center group hover:scale-105 transition-all duration-300 animate-fade-in-up border border-border rounded-xl p-6 shadow-lg"
                 style={{ animationDelay: "0.2s" }}
               >
                 <div className="mx-auto w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center mb-4 shadow-lg group-hover:shadow-xl transition-all duration-300">
@@ -448,7 +448,7 @@ export default function CanteenDashboard() {
                 <div className="text-2xl font-bold font-headline mb-2 text-green-600">
                   {stats.activeListings}
                 </div>
-                <div className="text-sm text-muted-foreground mb-1">
+                <div className="text-sm text-foreground mb-1">
                   Active Listings
                 </div>
                 <div className="text-xs text-green-500 font-medium">
@@ -457,7 +457,7 @@ export default function CanteenDashboard() {
               </div>
 
               <div
-                className="glass-card text-center group hover:scale-105 transition-all duration-300 animate-fade-in-up"
+                className="bg-card text-center group hover:scale-105 transition-all duration-300 animate-fade-in-up border border-border rounded-xl p-6 shadow-lg"
                 style={{ animationDelay: "0.3s" }}
               >
                 <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center mb-4 shadow-lg group-hover:shadow-xl transition-all duration-300">
@@ -466,16 +466,14 @@ export default function CanteenDashboard() {
                 <div className="text-2xl font-bold font-headline mb-2 text-blue-600">
                   {stats.totalFoodSaved}
                 </div>
-                <div className="text-sm text-muted-foreground mb-1">
-                  Food Saved
-                </div>
+                <div className="text-sm text-foreground mb-1">Food Saved</div>
                 <div className="text-xs text-blue-500 font-medium">
                   Total impact
                 </div>
               </div>
 
               <div
-                className="glass-card text-center group hover:scale-105 transition-all duration-300 animate-fade-in-up"
+                className="bg-card text-center group hover:scale-105 transition-all duration-300 animate-fade-in-up border border-border rounded-xl p-6 shadow-lg"
                 style={{ animationDelay: "0.4s" }}
               >
                 <div className="mx-auto w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center mb-4 shadow-lg group-hover:shadow-xl transition-all duration-300">
@@ -484,9 +482,7 @@ export default function CanteenDashboard() {
                 <div className="text-2xl font-bold font-headline mb-2 text-purple-600">
                   {stats.totalPickups}
                 </div>
-                <div className="text-sm text-muted-foreground mb-1">
-                  Pickups
-                </div>
+                <div className="text-sm text-foreground mb-1">Pickups</div>
                 <div className="text-xs text-purple-500 font-medium">
                   Completed
                 </div>
@@ -494,7 +490,7 @@ export default function CanteenDashboard() {
 
               {/* Safety Rating Card */}
               <div
-                className="glass-card text-center group hover:scale-105 transition-all duration-300 animate-fade-in-up"
+                className="bg-card text-center group hover:scale-105 transition-all duration-300 animate-fade-in-up border border-border rounded-xl p-6 shadow-lg"
                 style={{ animationDelay: "0.5s" }}
               >
                 <div className="mx-auto w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-full flex items-center justify-center mb-4 shadow-lg group-hover:shadow-xl transition-all duration-300">
@@ -511,7 +507,7 @@ export default function CanteenDashboard() {
                     return avg.toFixed(1);
                   })()}
                 </div>
-                <div className="text-sm text-muted-foreground mb-1">
+                <div className="text-sm text-foreground mb-1">
                   Safety Rating
                 </div>
                 <div className="text-xs text-emerald-500 font-medium">
@@ -526,7 +522,7 @@ export default function CanteenDashboard() {
 
           {/* Main Content Tabs */}
           <Tabs defaultValue="listings" className="space-y-6">
-            <TabsList className="glass-card border-0 shadow-lg backdrop-blur-md">
+            <TabsList className="bg-card border border-border shadow-lg rounded-lg">
               <TabsTrigger
                 value="listings"
                 className="data-[state=active]:bg-gradient-primary data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300"
@@ -549,15 +545,15 @@ export default function CanteenDashboard() {
 
             {/* Active Listings Tab */}
             <TabsContent value="listings" className="space-y-6">
-              <Card className="glass-card border-0 shadow-xl backdrop-blur-md">
+              <Card className="bg-card border border-border shadow-xl rounded-xl">
                 <CardHeader className="p-6 border-b border-border/50">
                   <h3 className="text-2xl font-headline font-semibold mb-2">
                     Food Listings
                   </h3>
-                  <p className="text-muted-foreground">
+                  <p className="text-foreground">
                     Manage your current surplus food listings
                     {searchQuery || safetyFilter !== "all" ? (
-                      <span className="text-muted-foreground">
+                      <span className="text-foreground/70">
                         {" "}
                         (Showing {canteenListings.length} of{" "}
                         {canteenListings.length} total)
@@ -567,7 +563,7 @@ export default function CanteenDashboard() {
                 </CardHeader>
                 <CardContent>
                   {/* Safety Filter and Search */}
-                  <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center gap-4 p-6 bg-muted/20 rounded-lg">
+                  <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center gap-4 p-6 bg-muted rounded-lg">
                     <div className="flex items-center gap-2">
                       <Label
                         htmlFor="safetyFilter"
@@ -579,10 +575,10 @@ export default function CanteenDashboard() {
                         value={safetyFilter}
                         onValueChange={setSafetyFilter}
                       >
-                        <SelectTrigger className="w-32 bg-background/80 backdrop-blur-sm border-border/50">
+                        <SelectTrigger className="w-32 bg-background border border-border">
                           <SelectValue placeholder="All" />
                         </SelectTrigger>
-                        <SelectContent className="glass-card border-0 shadow-xl">
+                        <SelectContent className="bg-card border border-border shadow-xl rounded-lg">
                           <SelectItem value="all">All</SelectItem>
                           <SelectItem value="5">5 - Excellent</SelectItem>
                           <SelectItem value="4">4 - Good</SelectItem>
@@ -606,7 +602,7 @@ export default function CanteenDashboard() {
                         placeholder="Search by name, quantity, or location..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="flex-1 bg-background/80 backdrop-blur-sm border-border/50 focus:ring-2 focus:ring-primary/20"
+                        className="flex-1 bg-background border border-border focus:ring-2 focus:ring-primary/20"
                       />
                       {searchQuery && (
                         <Button
@@ -629,7 +625,7 @@ export default function CanteenDashboard() {
                           ? "No listings found"
                           : "No food listings yet"}
                       </h3>
-                      <p className="text-muted-foreground mb-4">
+                      <p className="text-foreground mb-4">
                         {searchQuery
                           ? `No listings found matching "${searchQuery}". Try adjusting your search terms.`
                           : safetyFilter !== "all"
@@ -654,10 +650,10 @@ export default function CanteenDashboard() {
                       </div>
                     </div>
                   ) : (
-                    <div className="border border-border/50 rounded-xl overflow-hidden bg-background/50 backdrop-blur-sm">
+                    <div className="border border-border rounded-xl overflow-hidden bg-background">
                       <Table>
                         <TableHeader>
-                          <TableRow className="bg-gradient-to-r from-primary/5 to-secondary/5 border-b border-border/50">
+                          <TableRow className="bg-gradient-to-r from-primary/5 to-secondary/5 border-b border-border">
                             <TableHead
                               className="cursor-pointer hover:bg-primary/10 select-none font-medium text-foreground transition-colors duration-200 py-4"
                               onClick={() => handleSort("name")}
@@ -729,10 +725,10 @@ export default function CanteenDashboard() {
                                 isExpired(listing.expires)
                                   ? "bg-red-500/10 border-l-4 border-l-red-500"
                                   : ""
-                              } ${
+                              }                               ${
                                 index % 2 === 0
-                                  ? "bg-background/80 hover:bg-background/90"
-                                  : "bg-muted/20 hover:bg-muted/30"
+                                  ? "bg-background hover:bg-muted"
+                                  : "bg-muted hover:bg-muted/80"
                               } transition-all duration-200 hover:shadow-sm`}
                             >
                               <TableCell className="font-medium py-3">
@@ -743,13 +739,13 @@ export default function CanteenDashboard() {
                               </TableCell>
                               <TableCell className="py-3">
                                 <div className="flex items-center gap-2">
-                                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                                  <MapPin className="h-4 w-4 text-foreground" />
                                   {listing.pickupLocation || "Not specified"}
                                 </div>
                               </TableCell>
                               <TableCell className="py-3">
                                 <div className="flex items-center gap-2">
-                                  <Clock className="h-4 w-4 text-muted-foreground" />
+                                  <Clock className="h-4 w-4 text-foreground" />
                                   <span
                                     className={
                                       isExpired(listing.expires)
@@ -784,7 +780,7 @@ export default function CanteenDashboard() {
                                     }
                                   />
                                 ) : (
-                                  <span className="text-muted-foreground text-sm italic">
+                                  <span className="text-foreground text-sm italic">
                                     No safety data
                                   </span>
                                 )}
@@ -820,7 +816,7 @@ export default function CanteenDashboard() {
                       </Table>
 
                       {/* Table Summary */}
-                      <div className="p-6 bg-gradient-to-r from-primary/5 to-secondary/5 border-t border-border/50">
+                      <div className="p-6 bg-gradient-to-r from-primary/5 to-secondary/5 border-t border-border">
                         <div className="flex flex-wrap items-center justify-between gap-4 text-sm">
                           <div className="flex items-center gap-6">
                             <span className="flex items-center gap-2">
@@ -890,12 +886,12 @@ export default function CanteenDashboard() {
 
             {/* Pickup Tracking Tab */}
             <TabsContent value="pickups" className="space-y-6">
-              <div className="glass-card border-0 shadow-xl backdrop-blur-md">
+              <div className="bg-card border border-border shadow-xl rounded-xl">
                 <div className="p-6 border-b border-border/50">
                   <h3 className="text-2xl font-headline font-semibold mb-2">
                     Pickup Tracking
                   </h3>
-                  <p className="text-muted-foreground">
+                  <p className="text-foreground">
                     Monitor the status of your food pickups
                   </p>
                 </div>
@@ -917,7 +913,7 @@ export default function CanteenDashboard() {
                               <h4 className="font-medium font-headline">
                                 {listing.name}
                               </h4>
-                              <p className="text-sm text-muted-foreground">
+                              <p className="text-sm text-foreground">
                                 Picked up on{" "}
                                 {new Date(
                                   listing.createdAt || ""
@@ -940,7 +936,7 @@ export default function CanteenDashboard() {
                         <h3 className="text-xl font-headline font-semibold mb-2">
                           No Pickups Yet
                         </h3>
-                        <p className="text-muted-foreground max-w-md mx-auto">
+                        <p className="text-foreground max-w-md mx-auto">
                           When volunteers pick up your food listings, they'll
                           appear here for tracking.
                         </p>
@@ -953,12 +949,12 @@ export default function CanteenDashboard() {
 
             {/* Venue Analytics Tab */}
             <TabsContent value="analytics" className="space-y-6">
-              <div className="glass-card border-0 shadow-xl backdrop-blur-md">
+              <div className="bg-card border border-border shadow-xl rounded-xl">
                 <div className="p-6 border-b border-border/50">
                   <h3 className="text-2xl font-headline font-semibold mb-2">
                     Venue Analytics
                   </h3>
-                  <p className="text-muted-foreground">
+                  <p className="text-foreground">
                     Insights about your food waste reduction impact
                   </p>
                 </div>
@@ -970,23 +966,19 @@ export default function CanteenDashboard() {
                       </h4>
                       <div className="space-y-4">
                         <div className="flex items-center justify-between p-4 bg-gradient-to-r from-primary/5 to-secondary/5 rounded-xl border border-border/50">
-                          <span className="text-muted-foreground">
-                            Food Saved:
-                          </span>
+                          <span className="text-foreground">Food Saved:</span>
                           <span className="font-bold font-headline text-lg text-primary">
                             {stats.totalFoodSaved}
                           </span>
                         </div>
                         <div className="flex items-center justify-between p-4 bg-gradient-to-r from-green-500/5 to-emerald-500/5 rounded-xl border border-border/50">
-                          <span className="text-muted-foreground">
-                            Pickups:
-                          </span>
+                          <span className="text-foreground">Pickups:</span>
                           <span className="font-bold font-headline text-lg text-green-600">
                             {stats.totalPickups}
                           </span>
                         </div>
                         <div className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-500/5 to-cyan-500/5 rounded-xl border border-border/50">
-                          <span className="text-muted-foreground">
+                          <span className="text-foreground">
                             Active Listings:
                           </span>
                           <span className="font-bold font-headline text-lg text-blue-600">
@@ -1002,19 +994,19 @@ export default function CanteenDashboard() {
                       <div className="space-y-4">
                         <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-emerald-500/5 to-teal-500/5 rounded-xl border border-border/50">
                           <div className="w-3 h-3 bg-emerald-500 rounded-full"></div>
-                          <span className="text-sm text-muted-foreground">
+                          <span className="text-sm text-foreground">
                             CO2 emissions reduced
                           </span>
                         </div>
                         <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-blue-500/5 to-cyan-500/5 rounded-xl border border-border/50">
                           <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                          <span className="text-sm text-muted-foreground">
+                          <span className="text-sm text-foreground">
                             Water saved from food production
                           </span>
                         </div>
                         <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-purple-500/5 to-pink-500/5 rounded-xl border border-border/50">
                           <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-                          <span className="text-sm text-muted-foreground">
+                          <span className="text-sm text-foreground">
                             Landfill waste prevented
                           </span>
                         </div>
@@ -1030,12 +1022,12 @@ export default function CanteenDashboard() {
 
       {/* Add Food Listing Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto glass-card border-0 shadow-2xl backdrop-blur-md">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-card border border-border shadow-2xl rounded-xl">
           <DialogHeader>
             <DialogTitle className="text-2xl font-headline font-bold gradient-text">
               Add New Food Listing
             </DialogTitle>
-            <DialogDescription className="text-lg text-muted-foreground">
+            <DialogDescription className="text-lg text-foreground">
               Create a new surplus food listing with safety information
             </DialogDescription>
           </DialogHeader>
@@ -1174,12 +1166,12 @@ export default function CanteenDashboard() {
 
       {/* Edit Food Listing Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-md glass-card border-0 shadow-2xl backdrop-blur-md">
+        <DialogContent className="max-w-md bg-card border border-border shadow-2xl rounded-xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-headline font-bold gradient-text">
               Edit Food Listing
             </DialogTitle>
-            <DialogDescription className="text-muted-foreground">
+            <DialogDescription className="text-foreground">
               Update the status of this food listing
             </DialogDescription>
           </DialogHeader>
@@ -1206,7 +1198,7 @@ export default function CanteenDashboard() {
                   <SelectTrigger className="bg-background/80 backdrop-blur-sm border-border/50 focus:ring-2 focus:ring-primary/20">
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
-                  <SelectContent className="glass-card border-0 shadow-xl">
+                  <SelectContent className="bg-card border border-border shadow-xl rounded-lg">
                     <SelectItem value="Available">Available</SelectItem>
                     <SelectItem value="Picked Up">Picked Up</SelectItem>
                     <SelectItem value="Expired">Expired</SelectItem>
