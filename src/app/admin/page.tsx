@@ -76,6 +76,7 @@ import { TypeAnimation } from "@/components/ui/type-animation";
 import { Particles } from "@/components/ui/particles";
 import { AnimatedList } from "@/components/ui/animated-list";
 import { ScrollStack } from "@/components/ui/scroll-stack";
+import Link from "next/link";
 
 interface User {
   id: string;
@@ -173,8 +174,8 @@ export default function AdminDashboard() {
           return;
         }
 
-        const user = session.user;
-        if (user.role !== "Admin") {
+        const user: any = session.user as any;
+        if (user?.role !== "Admin") {
           toast({
             variant: "destructive",
             title: "Access Denied",
@@ -438,7 +439,10 @@ export default function AdminDashboard() {
     pickedUp: foodListings.filter((item) => item.status === "Picked Up").length,
     expired: foodListings.filter((item) => item.status === "Expired").length,
     withSafetyData: foodListings.filter(
-      (item) => item.safetyRating || item.allergenInfo || item.storageConditions
+      (item) =>
+        item.safetyRating ||
+        (item.allergens && item.allergens.length > 0) ||
+        item.storageConditions
     ).length,
   };
 
@@ -494,6 +498,11 @@ export default function AdminDashboard() {
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Link href="/admin/events">
+                      <Button variant="outline" size="sm">
+                        Events
+                      </Button>
+                    </Link>
                     <Button
                       variant="outline"
                       size="sm"
@@ -819,11 +828,11 @@ export default function AdminDashboard() {
                               </TableCell>
                               <TableCell>
                                 {item.safetyRating ||
-                                item.allergenInfo ||
+                                item.allergens?.length ||
                                 item.storageConditions ? (
                                   <FoodSafetyTags
                                     safetyRating={item.safetyRating}
-                                    allergenInfo={item.allergenInfo}
+                                    allergens={item.allergens}
                                     storageConditions={item.storageConditions}
                                   />
                                 ) : (

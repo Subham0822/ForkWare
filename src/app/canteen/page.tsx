@@ -60,9 +60,15 @@ import {
   Eye,
   Loader2,
   Shield,
+  Calendar,
 } from "lucide-react";
 import { AuthGuard } from "@/components/auth-guard";
 import { RoleGuard } from "@/components/role-guard";
+import {
+  getUpcomingEvents,
+  getEventPrefillExpiryDate,
+  type Event as DBEvent,
+} from "@/lib/database";
 
 interface CanteenStats {
   totalListings: number;
@@ -79,6 +85,8 @@ export default function CanteenDashboard() {
   const [editingListing, setEditingListing] = useState<FoodListing | null>(
     null
   );
+  const [selectedEventId, setSelectedEventId] = useState<string>("");
+  const [activeTab, setActiveTab] = useState("listings");
   const [stats, setStats] = useState<CanteenStats>({
     totalListings: 0,
     activeListings: 0,
@@ -108,6 +116,20 @@ export default function CanteenDashboard() {
     foodType: "",
     safeUntil: "",
   });
+
+  // Event integration: fetch ongoing/upcoming events and allow attachment
+  const [availableEvents, setAvailableEvents] = useState<DBEvent[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const events = await getUpcomingEvents();
+        setAvailableEvents(events);
+      } catch (e) {
+        // ignore silently
+      }
+    })();
+  }, []);
 
   // Food safety state
   const [safetyData, setSafetyData] = useState({
@@ -181,6 +203,11 @@ export default function CanteenDashboard() {
           return false;
       }
 
+      // Event filter
+      if (selectedEventId && listing.eventId !== selectedEventId) {
+        return false;
+      }
+
       // Search filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
@@ -217,11 +244,11 @@ export default function CanteenDashboard() {
       totalFoodSaved,
       totalPickups: pickedUp,
     });
-  }, [canteenListings, safetyFilter, searchQuery]);
+  }, [canteenListings, safetyFilter, searchQuery, selectedEventId]);
 
   useEffect(() => {
     calculateStats();
-  }, [canteenListings, safetyFilter, searchQuery]);
+  }, [canteenListings, safetyFilter, searchQuery, selectedEventId]);
 
   const handleAddListing = async () => {
     try {
@@ -233,6 +260,7 @@ export default function CanteenDashboard() {
         status: "Available",
         pickupLocation: newListing.pickupLocation,
         imageUrl: "",
+        eventId: selectedEventId || undefined,
         // Food Safety Fields
         temperature: safetyData.temperature || undefined,
         allergens:
@@ -260,6 +288,7 @@ export default function CanteenDashboard() {
         safetyRating: undefined,
         storageConditions: "",
       });
+      setSelectedEventId("");
     } catch (error) {
       toast({
         title: "Error",
@@ -521,13 +550,23 @@ export default function CanteenDashboard() {
           <QuickActions />
 
           {/* Main Content Tabs */}
-          <Tabs defaultValue="listings" className="space-y-6">
+          <Tabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="space-y-6"
+          >
             <TabsList className="bg-card border border-border shadow-lg rounded-lg">
               <TabsTrigger
                 value="listings"
                 className="data-[state=active]:bg-gradient-primary data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300"
               >
                 Active Listings
+              </TabsTrigger>
+              <TabsTrigger
+                value="events"
+                className="data-[state=active]:bg-gradient-primary data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300"
+              >
+                Event Management
               </TabsTrigger>
               <TabsTrigger
                 value="pickups"
@@ -586,6 +625,34 @@ export default function CanteenDashboard() {
                           <SelectItem value="2">2 - Poor</SelectItem>
                           <SelectItem value="1">1 - Unsafe</SelectItem>
                           <SelectItem value="none">No Rating</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Event Filter */}
+                    <div className="flex items-center gap-2">
+                      <Label
+                        htmlFor="eventFilter"
+                        className="text-sm font-medium whitespace-nowrap text-foreground"
+                      >
+                        Filter by Event:
+                      </Label>
+                      <Select
+                        value={selectedEventId || "all"}
+                        onValueChange={(v) =>
+                          setSelectedEventId(v === "all" ? "" : v)
+                        }
+                      >
+                        <SelectTrigger className="w-48 bg-background border border-border">
+                          <SelectValue placeholder="All Events" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-card border border-border shadow-xl rounded-lg">
+                          <SelectItem value="all">All Events</SelectItem>
+                          {availableEvents.map((ev) => (
+                            <SelectItem key={ev.id} value={ev.id}>
+                              {ev.name} • {ev.date}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -681,6 +748,9 @@ export default function CanteenDashboard() {
                               </div>
                             </TableHead>
                             <TableHead className="font-medium text-foreground py-4">
+                              Event
+                            </TableHead>
+                            <TableHead className="font-medium text-foreground py-4">
                               Location
                             </TableHead>
                             <TableHead
@@ -736,6 +806,22 @@ export default function CanteenDashboard() {
                               </TableCell>
                               <TableCell className="py-3">
                                 {listing.quantity}
+                              </TableCell>
+                              <TableCell className="py-3">
+                                {listing.eventId ? (
+                                  <div className="flex items-center gap-2">
+                                    <Calendar className="h-4 w-4 text-blue-600" />
+                                    <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                                      {availableEvents.find(
+                                        (e) => e.id === listing.eventId
+                                      )?.name || "Unknown Event"}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-sm text-muted-foreground italic">
+                                    No event
+                                  </span>
+                                )}
                               </TableCell>
                               <TableCell className="py-3">
                                 <div className="flex items-center gap-2">
@@ -882,6 +968,151 @@ export default function CanteenDashboard() {
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            {/* Event Management Tab */}
+            <TabsContent value="events" className="space-y-6">
+              <div className="bg-card border border-border shadow-xl rounded-xl">
+                <div className="p-6 border-b border-border/50">
+                  <h3 className="text-2xl font-headline font-semibold mb-2">
+                    Event Management
+                  </h3>
+                  <p className="text-foreground">
+                    Manage food listings for specific events and track event
+                    performance
+                  </p>
+                </div>
+                <div className="p-6">
+                  {availableEvents.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="text-lg font-medium mb-2">
+                        No Events Available
+                      </h3>
+                      <p className="text-foreground mb-4">
+                        There are no upcoming events to manage. Contact an admin
+                        to create events.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {availableEvents.map((event) => {
+                        const eventListings = foodListings.filter(
+                          (l) => l.eventId === event.id
+                        );
+                        const availableCount = eventListings.filter(
+                          (l) => l.status === "Available"
+                        ).length;
+                        const pickedUpCount = eventListings.filter(
+                          (l) => l.status === "Picked Up"
+                        ).length;
+                        const expiredCount = eventListings.filter(
+                          (l) => l.status === "Expired"
+                        ).length;
+
+                        return (
+                          <div
+                            key={event.id}
+                            className="border border-border rounded-xl p-6 bg-background/50 hover:bg-background/80 transition-all duration-200"
+                          >
+                            <div className="flex items-start justify-between mb-4">
+                              <div>
+                                <h4 className="text-xl font-headline font-semibold mb-2">
+                                  {event.name}
+                                </h4>
+                                <div className="flex items-center gap-4 text-sm text-foreground">
+                                  <span className="flex items-center gap-2">
+                                    <Calendar className="h-4 w-4" />
+                                    {event.date}
+                                  </span>
+                                  <span className="flex items-center gap-2">
+                                    <Clock className="h-4 w-4" />
+                                    {event.start_time} - {event.end_time}
+                                  </span>
+                                  <span className="flex items-center gap-2">
+                                    <MapPin className="h-4 w-4" />
+                                    {event.venue}
+                                  </span>
+                                </div>
+                              </div>
+                              <Badge
+                                variant={
+                                  event.status === "ongoing"
+                                    ? "default"
+                                    : event.status === "upcoming"
+                                    ? "secondary"
+                                    : "outline"
+                                }
+                              >
+                                {event.status}
+                              </Badge>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                              <div className="text-center p-3 bg-primary/5 rounded-lg">
+                                <div className="text-2xl font-bold text-primary">
+                                  {eventListings.length}
+                                </div>
+                                <div className="text-sm text-foreground">
+                                  Total Listings
+                                </div>
+                              </div>
+                              <div className="text-center p-3 bg-green-500/5 rounded-lg">
+                                <div className="text-2xl font-bold text-green-600">
+                                  {availableCount}
+                                </div>
+                                <div className="text-sm text-foreground">
+                                  Available
+                                </div>
+                              </div>
+                              <div className="text-center p-3 bg-blue-500/5 rounded-lg">
+                                <div className="text-2xl font-bold text-blue-600">
+                                  {pickedUpCount}
+                                </div>
+                                <div className="text-sm text-foreground">
+                                  Picked Up
+                                </div>
+                              </div>
+                              <div className="text-center p-3 bg-red-500/5 rounded-lg">
+                                <div className="text-2xl font-bold text-red-600">
+                                  {expiredCount}
+                                </div>
+                                <div className="text-sm text-foreground">
+                                  Expired
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              <Button
+                                onClick={() => {
+                                  setSelectedEventId(event.id);
+                                  setIsAddDialogOpen(true);
+                                }}
+                                size="sm"
+                                className="bg-gradient-primary text-white hover:shadow-glow-lg"
+                              >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add Food for Event
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedEventId(event.id);
+                                  setActiveTab("listings");
+                                }}
+                              >
+                                View Event Listings
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
             </TabsContent>
 
             {/* Pickup Tracking Tab */}
@@ -1084,6 +1315,46 @@ export default function CanteenDashboard() {
                   }
                   className="bg-background/80 backdrop-blur-sm border-border/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
                 />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-foreground">
+                  Attach to Event (optional)
+                </Label>
+                <Select
+                  value={selectedEventId}
+                  onValueChange={(v) => {
+                    setSelectedEventId(v);
+                    const ev = availableEvents.find((e) => e.id === v);
+                    if (ev) {
+                      const suggested = getEventPrefillExpiryDate(ev);
+                      // Convert ISO to local datetime-local format
+                      const dt = new Date(suggested);
+                      const local = new Date(
+                        dt.getTime() - dt.getTimezoneOffset() * 60000
+                      )
+                        .toISOString()
+                        .slice(0, 16);
+                      setNewListing((prev) => ({ ...prev, expiryDate: local }));
+                    }
+                  }}
+                >
+                  <SelectTrigger className="bg-background/80 backdrop-blur-sm border-border/50 focus:ring-2 focus:ring-primary/20">
+                    <SelectValue
+                      placeholder={
+                        availableEvents.length > 0
+                          ? "Select event"
+                          : "No upcoming events"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border border-border shadow-xl rounded-lg">
+                    {availableEvents.map((ev) => (
+                      <SelectItem key={ev.id} value={ev.id}>
+                        {ev.name} • {ev.date}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label

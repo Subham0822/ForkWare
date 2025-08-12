@@ -152,25 +152,32 @@ export default function QuickActions() {
           </CardContent>
         </Card>
 
-        {/* Bulk Add After Events */}
+        {/* Event Management */}
         <Card className="hover:shadow-md transition-shadow">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
-              Bulk Add After Events
+              Event Management
             </CardTitle>
             <CardDescription>
-              Quickly log multiple food items after campus events
+              Post surplus food for specific events and track performance
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Button
-              onClick={() => setIsBulkAddOpen(true)}
+              onClick={() => {
+                // Switch to events tab
+                const tabsList = document.querySelector('[role="tablist"]');
+                const eventsTab = tabsList?.querySelector(
+                  '[value="events"]'
+                ) as HTMLElement;
+                if (eventsTab) eventsTab.click();
+              }}
               className="w-full"
               variant="outline"
             >
-              <Plus className="h-4 w-4 mr-2" />
-              Bulk Add
+              <Calendar className="h-4 w-4 mr-2" />
+              Manage Events
             </Button>
           </CardContent>
         </Card>

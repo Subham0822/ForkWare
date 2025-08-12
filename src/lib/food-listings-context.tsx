@@ -29,6 +29,7 @@ export interface FoodListing {
   location?: string;
   image?: string;
   hint?: string;
+  eventId?: string;
   // Food Safety Fields
   temperature?: string;
   allergens?: string[];
@@ -74,6 +75,7 @@ const convertDBToListing = (dbListing: DBFoodListing): FoodListing => {
     image: dbListing.image_url || "https://placehold.co/600x400.png",
     createdAt: dbListing.created_at,
     hint: dbListing.food_name.toLowerCase(),
+    eventId: dbListing.event_id,
     // Food Safety Fields
     temperature: dbListing.temperature,
     allergens: dbListing.allergens,
@@ -130,6 +132,7 @@ const convertListingToDB = async (
         ? "picked_up"
         : "expired",
     image_url: listing.imageUrl,
+    event_id: listing.eventId,
     // Food Safety Fields
     temperature: listing.temperature,
     allergens: listing.allergens,

@@ -1,304 +1,736 @@
 "use client";
-import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+import React, { useState, useEffect } from "react";
 import {
-  Utensils,
-  Truck,
-  HeartHandshake,
-  Loader2,
-  TrendingUp,
-  Users,
-  Globe,
-  Award,
-  AlertTriangle,
-} from "lucide-react";
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Bar,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { AuthGuard } from "@/components/auth-guard";
+import { RoleGuard } from "@/components/role-guard";
+import { supabase } from "@/lib/supabase";
+import { getAllEvents, getEventSummary } from "@/lib/database";
+import {
   BarChart,
-  ResponsiveContainer,
+  Bar,
   XAxis,
   YAxis,
+  CartesianGrid,
   Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
-import {
-  ChartContainer,
-  ChartTooltipContent,
-  type ChartConfig,
-} from "@/components/ui/chart";
-import {
-  calculateAnalyticsWithGemini,
-  type AnalyticsData,
-} from "@/lib/gemini-analytics";
-import { getFoodListings } from "@/lib/database";
 
-const chartConfig = {
-  saved: {
-    label: "Food Saved (kg)",
-    color: "hsl(var(--primary))",
-  },
-};
+interface EventAnalytics {
+  id: string;
+  name: string;
+  date: string;
+  status: string;
+  totalListings: number;
+  available: number;
+  pickedUp: number;
+  expired: number;
+  totalQuantity: number;
+  pickedUpQuantity: number;
+  expiredQuantity: number;
+  mealsServedEstimate: number;
+  efficiency: number; // percentage of food picked up
+  rawQuantities: string[]; // Store original quantity strings for debugging
+}
+
+interface OverallStats {
+  totalEvents: number;
+  totalListings: number;
+  totalFoodSaved: number;
+  totalMealsServed: number;
+  averageEfficiency: number;
+  topPerformingEvents: EventAnalytics[];
+}
+
+const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
+
+// Helper function to parse quantity strings and extract numeric values
+function parseQuantity(quantityStr: string): number {
+  if (!quantityStr) return 0;
+
+  // Remove common units and extract numbers
+  const cleaned = quantityStr
+    .toLowerCase()
+    .replace(/plates?|servings?|portions?|meals?/g, "")
+    .replace(/kg|kilos?|kilograms?/g, "")
+    .replace(/g|grams?/g, "")
+    .replace(/lbs?|pounds?/g, "")
+    .replace(/oz|ounces?/g, "")
+    .replace(/pieces?|items?|units?/g, "")
+    .replace(/packets?|boxes?|containers?/g, "")
+    .trim();
+
+  // Extract the first number found
+  const match = cleaned.match(/(\d+(?:\.\d+)?)/);
+  if (match) {
+    const num = parseFloat(match[1]);
+
+    // Apply multipliers for different units
+    if (
+      quantityStr.toLowerCase().includes("kg") ||
+      quantityStr.toLowerCase().includes("kilo")
+    ) {
+      return num * 1000; // Convert kg to grams for consistency
+    } else if (
+      quantityStr.toLowerCase().includes("g") ||
+      quantityStr.toLowerCase().includes("gram")
+    ) {
+      return num;
+    } else if (
+      quantityStr.toLowerCase().includes("lb") ||
+      quantityStr.toLowerCase().includes("pound")
+    ) {
+      return num * 453.592; // Convert lbs to grams
+    } else if (
+      quantityStr.toLowerCase().includes("oz") ||
+      quantityStr.toLowerCase().includes("ounce")
+    ) {
+      return num * 28.3495; // Convert oz to grams
+    } else {
+      // Assume it's a count (plates, servings, etc.) - estimate 200g per serving
+      return num * 200;
+    }
+  }
+
+  return 0;
+}
 
 export default function AnalyticsPage() {
-  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(
-    null
-  );
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [events, setEvents] = useState<EventAnalytics[]>([]);
+  const [overallStats, setOverallStats] = useState<OverallStats | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<string>("all");
+  const [timeFilter, setTimeFilter] = useState<string>("30");
 
-  const fetchAnalyticsData = async () => {
+  useEffect(() => {
+    loadAnalytics();
+  }, [timeFilter]);
+
+  const loadAnalytics = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      setError(null);
+      // Get all events
+      const allEvents = await getAllEvents();
 
-      console.log("Fetching food listings from database...");
-      // Fetch food listings from database
-      const foodListings = await getFoodListings();
-      console.log("Food listings fetched:", foodListings.length, "items");
+      // Get analytics for each event
+      const eventAnalytics: EventAnalytics[] = [];
+      let totalListings = 0;
+      let totalFoodSaved = 0;
+      let totalMealsServed = 0;
 
-      console.log("Calculating analytics with Gemini AI...");
-      // Calculate analytics using Gemini AI
-      const analytics = await calculateAnalyticsWithGemini(foodListings);
-      console.log("Analytics calculated:", analytics);
-      setAnalyticsData(analytics);
-    } catch (err) {
-      console.error("Error fetching analytics:", err);
-      const errorMessage =
-        err instanceof Error ? err.message : "Unknown error occurred";
-      setError(
-        `Failed to load analytics data: ${errorMessage}. Please try again later.`
-      );
+      for (const event of allEvents) {
+        try {
+          const summary = await getEventSummary(event.id);
+
+          // Get raw quantity data for debugging
+          const rawQuantities: string[] = [];
+          try {
+            const { data: listings } = await supabase
+              .from("food_listings")
+              .select("quantity")
+              .eq("event_id", event.id);
+
+            if (listings) {
+              rawQuantities.push(...listings.map((l) => l.quantity || "0"));
+            }
+          } catch (error) {
+            console.warn(
+              `Could not fetch raw quantities for event ${event.id}:`,
+              error
+            );
+          }
+
+          // Parse quantities properly
+          const parsedTotal = parseQuantity(
+            summary.quantities.total.toString()
+          );
+          const parsedPickedUp = parseQuantity(
+            summary.quantities.pickedUp.toString()
+          );
+          const parsedExpired = parseQuantity(
+            summary.quantities.expired.toString()
+          );
+
+          const analytics: EventAnalytics = {
+            id: event.id,
+            name: event.name,
+            date: event.date,
+            status: event.status,
+            totalListings: summary.totals.totalListings,
+            available: summary.totals.available,
+            pickedUp: summary.totals.pickedUp,
+            expired: summary.totals.expired,
+            totalQuantity: parsedTotal,
+            pickedUpQuantity: parsedPickedUp,
+            expiredQuantity: parsedExpired,
+            mealsServedEstimate:
+              parsedPickedUp > 0 ? Math.round(parsedPickedUp / 200) : 0, // Estimate 200g per meal
+            efficiency:
+              parsedTotal > 0
+                ? Math.round((parsedPickedUp / parsedTotal) * 100)
+                : 0,
+            rawQuantities,
+          };
+
+          eventAnalytics.push(analytics);
+
+          totalListings += summary.totals.totalListings;
+          totalFoodSaved += summary.quantities.total;
+          totalMealsServed += summary.mealsServedEstimate;
+        } catch (error) {
+          console.error(`Error getting summary for event ${event.id}:`, error);
+        }
+      }
+
+      // Sort by efficiency (descending)
+      eventAnalytics.sort((a, b) => b.efficiency - a.efficiency);
+
+      // Calculate overall stats
+      const overall: OverallStats = {
+        totalEvents: allEvents.length,
+        totalListings,
+        totalFoodSaved,
+        totalMealsServed,
+        averageEfficiency:
+          eventAnalytics.length > 0
+            ? Math.round(
+                eventAnalytics.reduce((sum, e) => sum + e.efficiency, 0) /
+                  eventAnalytics.length
+              )
+            : 0,
+        topPerformingEvents: eventAnalytics.slice(0, 5),
+      };
+
+      setEvents(eventAnalytics);
+      setOverallStats(overall);
+    } catch (error) {
+      console.error("Error loading analytics:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load analytics data",
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchAnalyticsData();
-  }, []);
+  const getFilteredEvents = () => {
+    if (selectedEvent === "all") return events;
+    return events.filter((e) => e.id === selectedEvent);
+  };
 
-  // Mock data for demonstration
-  const mockStats = [
-    {
-      label: "Total Food Saved",
-      value: "2,847 kg",
-      icon: TrendingUp,
-      color: "text-green-500",
-      change: "+12%",
-    },
-    {
-      label: "Active Volunteers",
-      value: "156",
-      icon: Users,
-      color: "text-blue-500",
-      change: "+8%",
-    },
-    {
-      label: "Partner Canteens",
-      value: "34",
-      icon: Utensils,
-      color: "text-purple-500",
-      change: "+5%",
-    },
-    {
-      label: "Cities Covered",
-      value: "18",
-      icon: Globe,
-      color: "text-orange-500",
-      change: "+3%",
-    },
-  ];
+  const getFilteredStats = () => {
+    const filtered = getFilteredEvents();
+    if (filtered.length === 0) return null;
+
+    return {
+      totalEvents: filtered.length,
+      totalListings: filtered.reduce((sum, e) => sum + e.totalListings, 0),
+      totalFoodSaved: filtered.reduce((sum, e) => sum + e.totalQuantity, 0),
+      totalMealsServed: filtered.reduce(
+        (sum, e) => sum + e.mealsServedEstimate,
+        0
+      ),
+      averageEfficiency: Math.round(
+        filtered.reduce((sum, e) => sum + e.efficiency, 0) / filtered.length
+      ),
+    };
+  };
+
+  const getChartData = () => {
+    const filtered = getFilteredEvents();
+    return filtered.map((event) => ({
+      name: event.name,
+      "Picked Up": event.pickedUpQuantity,
+      Expired: event.expiredQuantity,
+      Available: event.available,
+    }));
+  };
+
+  const getEfficiencyData = () => {
+    const filtered = getFilteredEvents();
+    return filtered.map((event) => ({
+      name: event.name,
+      efficiency: event.efficiency,
+    }));
+  };
+
+  const getStatusDistribution = () => {
+    const filtered = getFilteredEvents();
+    const total = filtered.reduce((sum, e) => sum + e.totalListings, 0);
+
+    if (total === 0) return [];
+
+    const pickedUp = filtered.reduce((sum, e) => sum + e.pickedUp, 0);
+    const expired = filtered.reduce((sum, e) => sum + e.expired, 0);
+    const available = filtered.reduce((sum, e) => sum + e.available, 0);
+
+    return [
+      { name: "Picked Up", value: pickedUp, color: "#00C49F" },
+      { name: "Expired", value: expired, color: "#FF8042" },
+      { name: "Available", value: available, color: "#0088FE" },
+    ];
+  };
 
   if (loading) {
     return (
-      <div className="container mx-auto py-10 px-4 md:px-6">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-12 animate-fade-in-down">
-          <div>
-            <h1 className="text-4xl md:text-5xl font-headline font-bold gradient-text">
-              Platform Analytics
-            </h1>
-            <p className="text-xl text-muted-foreground mt-2">
-              AI-powered insights into food waste reduction and community impact
-            </p>
+      <div className="container mx-auto p-4">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-200 rounded w-1/3"></div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-32 bg-gray-200 rounded"></div>
+            ))}
           </div>
-          <button
-            onClick={() => {
-              setLoading(true);
-              setError(null);
-              fetchAnalyticsData();
-            }}
-            className="px-6 py-3 bg-gradient-primary text-white rounded-xl hover:shadow-glow-lg transition-all duration-300 flex items-center space-x-2 group hover:scale-105"
-            disabled={loading}
-          >
-            <Loader2 className={`h-5 w-5 ${loading ? "animate-spin" : ""}`} />
-            <span className="group-hover:translate-x-0.5 transition-transform duration-200">
-              Refresh Data
-            </span>
-          </button>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
-          {mockStats.map((stat, index) => (
-            <div
-              key={stat.label}
-              className="glass-card text-center group hover:scale-105 transition-all duration-300 animate-fade-in-up"
-              style={{ animationDelay: `${index * 0.1}s` }}
-            >
-              <div
-                className={`mx-auto w-16 h-16 bg-gradient-primary rounded-full flex items-center justify-center mb-4 shadow-lg group-hover:shadow-xl transition-all duration-300`}
-              >
-                <stat.icon className={`h-8 w-8 text-white`} />
-              </div>
-              <div className="text-2xl font-bold font-headline mb-2">
-                {stat.value}
-              </div>
-              <div className="text-sm text-muted-foreground mb-1">
-                {stat.label}
-              </div>
-              <div className="text-xs text-green-500 font-medium">
-                {stat.change}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Loading State */}
-        <div className="flex items-center justify-center h-64">
-          <div className="flex flex-col items-center space-y-6">
-            <div className="relative">
-              <div className="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-              <div
-                className="absolute inset-0 w-16 h-16 border-4 border-transparent border-t-secondary rounded-full animate-spin"
-                style={{
-                  animationDirection: "reverse",
-                  animationDuration: "2s",
-                }}
-              ></div>
-            </div>
-            <div className="text-center space-y-2">
-              <p className="text-lg font-medium text-muted-foreground">
-                Calculating analytics with AI...
-              </p>
-              <p className="text-sm text-muted-foreground">
-                This may take a few moments
-              </p>
-            </div>
-          </div>
+          <div className="h-64 bg-gray-200 rounded"></div>
         </div>
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <div className="container mx-auto py-10 px-4 md:px-6">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-headline font-bold">
-            Platform Analytics
-          </h1>
-          <button
-            onClick={() => {
-              setLoading(true);
-              setError(null);
-              fetchAnalyticsData();
-            }}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 flex items-center space-x-2"
-          >
-            <Loader2 className="h-4 w-4" />
-            <span>Retry</span>
-          </button>
-        </div>
-        <div className="glass-card text-center py-16">
-          <div className="w-24 h-24 bg-gradient-accent rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
-            <AlertTriangle className="h-12 w-12 text-white" />
-          </div>
-          <h3 className="text-2xl font-headline font-semibold mb-4">
-            Error Loading Analytics
-          </h3>
-          <p className="text-muted-foreground max-w-md mx-auto mb-6">{error}</p>
-          <button
-            onClick={() => {
-              setLoading(true);
-              setError(null);
-              fetchAnalyticsData();
-            }}
-            className="px-6 py-3 bg-gradient-primary text-white rounded-xl hover:shadow-glow-lg transition-all duration-300 hover:scale-105"
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const filteredStats = getFilteredStats();
 
   return (
-    <div className="container mx-auto py-10 px-4 md:px-6">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-12 animate-fade-in-down">
-        <div>
-          <h1 className="text-4xl md:text-5xl font-headline font-bold gradient-text">
-            Platform Analytics
-          </h1>
-          <p className="text-xl text-muted-foreground mt-2">
-            AI-powered insights into food waste reduction and community impact
-          </p>
-        </div>
-        <button
-          onClick={() => {
-            setLoading(true);
-            setError(null);
-            fetchAnalyticsData();
-          }}
-          className="px-6 py-3 bg-gradient-primary text-white rounded-xl hover:shadow-glow-lg transition-all duration-300 flex items-center space-x-2 group hover:scale-105"
-        >
-          <Loader2 className="h-5 w-5" />
-          <span className="group-hover:translate-x-0.5 transition-transform duration-200">
-            Refresh Data
-          </span>
-        </button>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
-        {mockStats.map((stat, index) => (
-          <div
-            key={stat.label}
-            className="glass-card text-center group hover:scale-105 transition-all duration-300 animate-fade-in-up"
-            style={{ animationDelay: `${index * 0.1}s` }}
-          >
-            <div
-              className={`mx-auto w-16 h-16 bg-gradient-primary rounded-full flex items-center justify-center mb-4 shadow-lg group-hover:shadow-xl transition-all duration-300`}
-            >
-              <stat.icon className={`h-8 w-8 text-white`} />
+    <AuthGuard>
+      <RoleGuard allowedRoles={["Admin"]}>
+        <div className="container mx-auto p-4 space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold">Event Analytics Dashboard</h1>
+              <p className="text-muted-foreground">
+                Track the impact of your events and food redistribution efforts
+              </p>
             </div>
-            <div className="text-2xl font-bold font-headline mb-2">
-              {stat.value}
-            </div>
-            <div className="text-sm text-muted-foreground mb-1">
-              {stat.label}
-            </div>
-            <div className="text-xs text-green-500 font-medium">
-              {stat.change}
+            <div className="flex gap-2">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="timeFilter">Time Period:</Label>
+                <Select value={timeFilter} onValueChange={setTimeFilter}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7">Last 7 days</SelectItem>
+                    <SelectItem value="30">Last 30 days</SelectItem>
+                    <SelectItem value="90">Last 90 days</SelectItem>
+                    <SelectItem value="all">All time</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="eventFilter">Event:</Label>
+                <Select value={selectedEvent} onValueChange={setSelectedEvent}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="All Events" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Events</SelectItem>
+                    {events.map((event) => (
+                      <SelectItem key={event.id} value={event.id}>
+                        {event.name} ({event.date})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
-        ))}
-      </div>
 
-      {/* Analytics Content */}
-      {analyticsData && (
-        <div className="space-y-8 animate-fade-in-up">
-          {/* Charts and other analytics content would go here */}
-          <div className="glass-card">
-            <h3 className="text-2xl font-headline font-semibold mb-6">
-              Analytics Data Loaded
-            </h3>
-            <p className="text-muted-foreground">
-              Analytics data has been successfully loaded and processed by AI.
-            </p>
-          </div>
+          {/* Overall Stats */}
+          {overallStats && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Total Events
+                  </CardTitle>
+                  <Badge variant="secondary">{overallStats.totalEvents}</Badge>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {overallStats.totalEvents}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Events managed through the system
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Total Food Saved
+                  </CardTitle>
+                  <Badge variant="secondary">
+                    {(overallStats.totalFoodSaved / 1000).toFixed(1)} kg
+                  </Badge>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {(overallStats.totalFoodSaved / 1000).toFixed(1)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Kilograms of food posted as surplus (parsed from quantity
+                    strings)
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Meals Served
+                  </CardTitle>
+                  <Badge variant="secondary">
+                    {overallStats.totalMealsServed}
+                  </Badge>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {overallStats.totalMealsServed}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Estimated meals served through redistribution
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Avg. Efficiency
+                  </CardTitle>
+                  <Badge variant="secondary">
+                    {overallStats.averageEfficiency}%
+                  </Badge>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {overallStats.averageEfficiency}%
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Average food pickup rate across events
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Filtered Stats */}
+          {filteredStats && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Filtered Statistics</CardTitle>
+                <CardDescription>
+                  {selectedEvent === "all"
+                    ? "All Events"
+                    : `Event: ${
+                        events.find((e) => e.id === selectedEvent)?.name
+                      }`}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                  <div>
+                    <div className="text-2xl font-bold">
+                      {filteredStats.totalEvents}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Events</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold">
+                      {filteredStats.totalListings}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Listings
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold">
+                      {filteredStats.totalFoodSaved}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Food Saved (kg)
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold">
+                      {filteredStats.averageEfficiency}%
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Efficiency
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Charts */}
+          <Tabs defaultValue="overview" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="efficiency">Efficiency Analysis</TabsTrigger>
+              <TabsTrigger value="distribution">
+                Status Distribution
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="overview" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Food Distribution by Event</CardTitle>
+                  <CardDescription>
+                    Shows how much food was picked up vs expired for each event
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={400}>
+                    <BarChart data={getChartData()}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="Picked Up" fill="#00C49F" />
+                      <Bar dataKey="Expired" fill="#FF8042" />
+                      <Bar dataKey="Available" fill="#0088FE" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="efficiency" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Event Efficiency Ranking</CardTitle>
+                  <CardDescription>
+                    Events ranked by their food pickup efficiency percentage
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={400}>
+                    <BarChart data={getEfficiencyData()} layout="horizontal">
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis type="number" domain={[0, 100]} />
+                      <YAxis dataKey="name" type="category" width={150} />
+                      <Tooltip formatter={(value) => `${value}%`} />
+                      <Bar dataKey="efficiency" fill="#00C49F" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="distribution" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Overall Status Distribution</CardTitle>
+                  <CardDescription>
+                    Pie chart showing the breakdown of all food listings by
+                    status
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={400}>
+                    <PieChart>
+                      <Pie
+                        data={getStatusDistribution()}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) =>
+                          `${name} ${(percent * 100).toFixed(0)}%`
+                        }
+                        outerRadius={150}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {getStatusDistribution().map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+
+          {/* Top Performing Events */}
+          {overallStats && overallStats.topPerformingEvents.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Top Performing Events</CardTitle>
+                <CardDescription>
+                  Events with the highest food pickup efficiency
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {overallStats.topPerformingEvents.map((event, index) => (
+                    <div
+                      key={event.id}
+                      className="flex items-center justify-between p-4 border rounded-lg"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center font-bold">
+                          {index + 1}
+                        </div>
+                        <div>
+                          <div className="font-semibold">{event.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {event.date}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-green-600">
+                          {event.efficiency}%
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {event.pickedUpQuantity} kg picked up
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Event Details Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Event Details</CardTitle>
+              <CardDescription>
+                Comprehensive breakdown of all events and their performance
+                <br />
+                <span className="text-xs text-muted-foreground">
+                  Quantities are parsed from strings (e.g., "50 plates" → 10kg
+                  estimated)
+                </span>
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-2 text-foreground font-medium">
+                        Event
+                      </th>
+                      <th className="text-left p-2 text-foreground font-medium">
+                        Date
+                      </th>
+                      <th className="text-left p-2 text-foreground font-medium">
+                        Status
+                      </th>
+                      <th className="text-left p-2 text-foreground font-medium">
+                        Listings
+                      </th>
+                      <th className="text-left p-2 text-foreground font-medium">
+                        Food Saved (g)
+                      </th>
+                      <th className="text-left p-2 text-foreground font-medium">
+                        Picked Up (g)
+                      </th>
+                      <th className="text-left p-2 text-foreground font-medium">
+                        Efficiency
+                      </th>
+                      <th className="text-left p-2 text-foreground font-medium">
+                        Raw Data
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {events.map((event) => (
+                      <tr
+                        key={event.id}
+                        className="border-b hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                      >
+                        <td className="p-2 font-medium text-foreground">
+                          {event.name}
+                        </td>
+                        <td className="p-2 text-foreground">{event.date}</td>
+                        <td className="p-2">
+                          <Badge
+                            variant={
+                              event.status === "completed"
+                                ? "default"
+                                : event.status === "ongoing"
+                                ? "secondary"
+                                : "outline"
+                            }
+                          >
+                            {event.status}
+                          </Badge>
+                        </td>
+                        <td className="p-2 text-foreground">
+                          {event.totalListings}
+                        </td>
+                        <td className="p-2 text-foreground">
+                          {event.totalQuantity > 0
+                            ? `${(event.totalQuantity / 1000).toFixed(1)} kg`
+                            : "0 kg"}
+                        </td>
+                        <td className="p-2 text-foreground">
+                          {event.pickedUpQuantity > 0
+                            ? `${(event.pickedUpQuantity / 1000).toFixed(1)} kg`
+                            : "0 kg"}
+                        </td>
+                        <td className="p-2">
+                          <span
+                            className={`font-semibold ${
+                              event.efficiency >= 80
+                                ? "text-green-600 dark:text-green-400"
+                                : event.efficiency >= 60
+                                ? "text-yellow-600 dark:text-yellow-400"
+                                : "text-red-600 dark:text-red-400"
+                            }`}
+                          >
+                            {event.efficiency}%
+                          </span>
+                        </td>
+                        <td className="p-2 text-xs text-muted-foreground">
+                          <div
+                            className="max-w-32 truncate"
+                            title={event.rawQuantities.join(", ")}
+                          >
+                            {event.rawQuantities.length > 0
+                              ? event.rawQuantities.join(", ")
+                              : "No data"}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      )}
-    </div>
+      </RoleGuard>
+    </AuthGuard>
   );
 }
