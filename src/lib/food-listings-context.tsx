@@ -150,12 +150,19 @@ export function FoodListingsProvider({ children }: { children: ReactNode }) {
 
   const refreshListings = async () => {
     try {
+      console.log("🔄 Starting to refresh food listings...");
       setIsLoading(true);
+
       const dbListings = await getFoodListings();
+      console.log("📊 Raw database listings:", dbListings);
+
       const convertedListings = dbListings.map(convertDBToListing);
+      console.log("🔄 Converted listings:", convertedListings);
+
       setFoodListings(convertedListings);
+      console.log("✅ Food listings updated in state");
     } catch (error) {
-      console.error("Failed to fetch food listings:", error);
+      console.error("❌ Failed to fetch food listings:", error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -283,7 +290,20 @@ export function FoodListingsProvider({ children }: { children: ReactNode }) {
   };
 
   const getAvailableListings = () => {
-    return foodListings.filter((item) => item.status === "Available");
+    const now = new Date();
+    return foodListings.filter((item) => {
+      // Only show available items that haven't expired
+      if (item.status !== "Available") return false;
+
+      // Check if the item has expired
+      try {
+        const expiryDate = new Date(item.expires);
+        if (isNaN(expiryDate.getTime())) return false;
+        return expiryDate > now;
+      } catch (error) {
+        return false;
+      }
+    });
   };
 
   // Load initial data

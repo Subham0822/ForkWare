@@ -21,7 +21,6 @@ import {
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { AuthGuard } from "@/components/auth-guard";
-import { RoleGuard } from "@/components/role-guard";
 import { supabase } from "@/lib/supabase";
 import { getAllEvents, getEventSummary } from "@/lib/database";
 import {
@@ -315,422 +314,415 @@ export default function AnalyticsPage() {
 
   return (
     <AuthGuard>
-      <RoleGuard allowedRoles={["Admin"]}>
-        <div className="container mx-auto p-4 space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold">Event Analytics Dashboard</h1>
-              <p className="text-muted-foreground">
-                Track the impact of your events and food redistribution efforts
-              </p>
+      <div className="container mx-auto p-4 space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Event Analytics Dashboard</h1>
+            <p className="text-muted-foreground">
+              Track the impact of your events and food redistribution efforts
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="timeFilter">Time Period:</Label>
+              <Select value={timeFilter} onValueChange={setTimeFilter}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">Last 7 days</SelectItem>
+                  <SelectItem value="30">Last 30 days</SelectItem>
+                  <SelectItem value="90">Last 90 days</SelectItem>
+                  <SelectItem value="all">All time</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <div className="flex gap-2">
-              <div className="flex items-center gap-2">
-                <Label htmlFor="timeFilter">Time Period:</Label>
-                <Select value={timeFilter} onValueChange={setTimeFilter}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="7">Last 7 days</SelectItem>
-                    <SelectItem value="30">Last 30 days</SelectItem>
-                    <SelectItem value="90">Last 90 days</SelectItem>
-                    <SelectItem value="all">All time</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center gap-2">
-                <Label htmlFor="eventFilter">Event:</Label>
-                <Select value={selectedEvent} onValueChange={setSelectedEvent}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="All Events" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Events</SelectItem>
-                    {events.map((event) => (
-                      <SelectItem key={event.id} value={event.id}>
-                        {event.name} ({event.date})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="eventFilter">Event:</Label>
+              <Select value={selectedEvent} onValueChange={setSelectedEvent}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="All Events" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Events</SelectItem>
+                  {events.map((event) => (
+                    <SelectItem key={event.id} value={event.id}>
+                      {event.name} ({event.date})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
+        </div>
 
-          {/* Overall Stats */}
-          {overallStats && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Total Events
-                  </CardTitle>
-                  <Badge variant="secondary">{overallStats.totalEvents}</Badge>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {overallStats.totalEvents}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Events managed through the system
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Total Food Saved
-                  </CardTitle>
-                  <Badge variant="secondary">
-                    {(overallStats.totalFoodSaved / 1000).toFixed(1)} kg
-                  </Badge>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {(overallStats.totalFoodSaved / 1000).toFixed(1)}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Kilograms of food posted as surplus (parsed from quantity
-                    strings)
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Meals Served
-                  </CardTitle>
-                  <Badge variant="secondary">
-                    {overallStats.totalMealsServed}
-                  </Badge>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {overallStats.totalMealsServed}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Estimated meals served through redistribution
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Avg. Efficiency
-                  </CardTitle>
-                  <Badge variant="secondary">
-                    {overallStats.averageEfficiency}%
-                  </Badge>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {overallStats.averageEfficiency}%
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Average food pickup rate across events
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {/* Filtered Stats */}
-          {filteredStats && (
+        {/* Overall Stats */}
+        {overallStats && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card>
-              <CardHeader>
-                <CardTitle>Filtered Statistics</CardTitle>
-                <CardDescription>
-                  {selectedEvent === "all"
-                    ? "All Events"
-                    : `Event: ${
-                        events.find((e) => e.id === selectedEvent)?.name
-                      }`}
-                </CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Total Events
+                </CardTitle>
+                <Badge variant="secondary">{overallStats.totalEvents}</Badge>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                  <div>
-                    <div className="text-2xl font-bold">
-                      {filteredStats.totalEvents}
-                    </div>
-                    <div className="text-sm text-muted-foreground">Events</div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold">
-                      {filteredStats.totalListings}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Listings
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold">
-                      {filteredStats.totalFoodSaved}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Food Saved (kg)
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold">
-                      {filteredStats.averageEfficiency}%
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Efficiency
-                    </div>
-                  </div>
+                <div className="text-2xl font-bold">
+                  {overallStats.totalEvents}
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Events managed through the system
+                </p>
               </CardContent>
             </Card>
-          )}
-
-          {/* Charts */}
-          <Tabs defaultValue="overview" className="space-y-4">
-            <TabsList>
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="efficiency">Efficiency Analysis</TabsTrigger>
-              <TabsTrigger value="distribution">
-                Status Distribution
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="overview" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Food Distribution by Event</CardTitle>
-                  <CardDescription>
-                    Shows how much food was picked up vs expired for each event
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={400}>
-                    <BarChart data={getChartData()}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="Picked Up" fill="#00C49F" />
-                      <Bar dataKey="Expired" fill="#FF8042" />
-                      <Bar dataKey="Available" fill="#0088FE" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="efficiency" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Event Efficiency Ranking</CardTitle>
-                  <CardDescription>
-                    Events ranked by their food pickup efficiency percentage
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={400}>
-                    <BarChart data={getEfficiencyData()} layout="horizontal">
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" domain={[0, 100]} />
-                      <YAxis dataKey="name" type="category" width={150} />
-                      <Tooltip formatter={(value) => `${value}%`} />
-                      <Bar dataKey="efficiency" fill="#00C49F" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="distribution" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Overall Status Distribution</CardTitle>
-                  <CardDescription>
-                    Pie chart showing the breakdown of all food listings by
-                    status
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={400}>
-                    <PieChart>
-                      <Pie
-                        data={getStatusDistribution()}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, percent }) =>
-                          `${name} ${(percent * 100).toFixed(0)}%`
-                        }
-                        outerRadius={150}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {getStatusDistribution().map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-
-          {/* Top Performing Events */}
-          {overallStats && overallStats.topPerformingEvents.length > 0 && (
             <Card>
-              <CardHeader>
-                <CardTitle>Top Performing Events</CardTitle>
-                <CardDescription>
-                  Events with the highest food pickup efficiency
-                </CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Total Food Saved
+                </CardTitle>
+                <Badge variant="secondary">
+                  {(overallStats.totalFoodSaved / 1000).toFixed(1)} kg
+                </Badge>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {overallStats.topPerformingEvents.map((event, index) => (
-                    <div
-                      key={event.id}
-                      className="flex items-center justify-between p-4 border rounded-lg"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center font-bold">
-                          {index + 1}
-                        </div>
-                        <div>
-                          <div className="font-semibold">{event.name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {event.date}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-2xl font-bold text-green-600">
-                          {event.efficiency}%
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {event.pickedUpQuantity} kg picked up
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                <div className="text-2xl font-bold">
+                  {(overallStats.totalFoodSaved / 1000).toFixed(1)}
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Kilograms of food posted as surplus (parsed from quantity
+                  strings)
+                </p>
               </CardContent>
             </Card>
-          )}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Meals Served
+                </CardTitle>
+                <Badge variant="secondary">
+                  {overallStats.totalMealsServed}
+                </Badge>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {overallStats.totalMealsServed}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Estimated meals served through redistribution
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Avg. Efficiency
+                </CardTitle>
+                <Badge variant="secondary">
+                  {overallStats.averageEfficiency}%
+                </Badge>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {overallStats.averageEfficiency}%
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Average food pickup rate across events
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
-          {/* Event Details Table */}
+        {/* Filtered Stats */}
+        {filteredStats && (
           <Card>
             <CardHeader>
-              <CardTitle>Event Details</CardTitle>
+              <CardTitle>Filtered Statistics</CardTitle>
               <CardDescription>
-                Comprehensive breakdown of all events and their performance
-                <br />
-                <span className="text-xs text-muted-foreground">
-                  Quantities are parsed from strings (e.g., "50 plates" → 10kg
-                  estimated)
-                </span>
+                {selectedEvent === "all"
+                  ? "All Events"
+                  : `Event: ${
+                      events.find((e) => e.id === selectedEvent)?.name
+                    }`}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left p-2 text-foreground font-medium">
-                        Event
-                      </th>
-                      <th className="text-left p-2 text-foreground font-medium">
-                        Date
-                      </th>
-                      <th className="text-left p-2 text-foreground font-medium">
-                        Status
-                      </th>
-                      <th className="text-left p-2 text-foreground font-medium">
-                        Listings
-                      </th>
-                      <th className="text-left p-2 text-foreground font-medium">
-                        Food Saved (g)
-                      </th>
-                      <th className="text-left p-2 text-foreground font-medium">
-                        Picked Up (g)
-                      </th>
-                      <th className="text-left p-2 text-foreground font-medium">
-                        Efficiency
-                      </th>
-                      <th className="text-left p-2 text-foreground font-medium">
-                        Raw Data
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {events.map((event) => (
-                      <tr
-                        key={event.id}
-                        className="border-b hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                      >
-                        <td className="p-2 font-medium text-foreground">
-                          {event.name}
-                        </td>
-                        <td className="p-2 text-foreground">{event.date}</td>
-                        <td className="p-2">
-                          <Badge
-                            variant={
-                              event.status === "completed"
-                                ? "default"
-                                : event.status === "ongoing"
-                                ? "secondary"
-                                : "outline"
-                            }
-                          >
-                            {event.status}
-                          </Badge>
-                        </td>
-                        <td className="p-2 text-foreground">
-                          {event.totalListings}
-                        </td>
-                        <td className="p-2 text-foreground">
-                          {event.totalQuantity > 0
-                            ? `${(event.totalQuantity / 1000).toFixed(1)} kg`
-                            : "0 kg"}
-                        </td>
-                        <td className="p-2 text-foreground">
-                          {event.pickedUpQuantity > 0
-                            ? `${(event.pickedUpQuantity / 1000).toFixed(1)} kg`
-                            : "0 kg"}
-                        </td>
-                        <td className="p-2">
-                          <span
-                            className={`font-semibold ${
-                              event.efficiency >= 80
-                                ? "text-green-600 dark:text-green-400"
-                                : event.efficiency >= 60
-                                ? "text-yellow-600 dark:text-yellow-400"
-                                : "text-red-600 dark:text-red-400"
-                            }`}
-                          >
-                            {event.efficiency}%
-                          </span>
-                        </td>
-                        <td className="p-2 text-xs text-muted-foreground">
-                          <div
-                            className="max-w-32 truncate"
-                            title={event.rawQuantities.join(", ")}
-                          >
-                            {event.rawQuantities.length > 0
-                              ? event.rawQuantities.join(", ")
-                              : "No data"}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                <div>
+                  <div className="text-2xl font-bold">
+                    {filteredStats.totalEvents}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Events</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">
+                    {filteredStats.totalListings}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Listings</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">
+                    {filteredStats.totalFoodSaved}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Food Saved (kg)
+                  </div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">
+                    {filteredStats.averageEfficiency}%
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Efficiency
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
-        </div>
-      </RoleGuard>
+        )}
+
+        {/* Charts */}
+        <Tabs defaultValue="overview" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="efficiency">Efficiency Analysis</TabsTrigger>
+            <TabsTrigger value="distribution">Status Distribution</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Food Distribution by Event</CardTitle>
+                <CardDescription>
+                  Shows how much food was picked up vs expired for each event
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={400}>
+                  <BarChart data={getChartData()}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="Picked Up" fill="#00C49F" />
+                    <Bar dataKey="Expired" fill="#FF8042" />
+                    <Bar dataKey="Available" fill="#0088FE" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="efficiency" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Event Efficiency Ranking</CardTitle>
+                <CardDescription>
+                  Events ranked by their food pickup efficiency percentage
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={400}>
+                  <BarChart data={getEfficiencyData()} layout="horizontal">
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" domain={[0, 100]} />
+                    <YAxis dataKey="name" type="category" width={150} />
+                    <Tooltip formatter={(value) => `${value}%`} />
+                    <Bar dataKey="efficiency" fill="#00C49F" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="distribution" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Overall Status Distribution</CardTitle>
+                <CardDescription>
+                  Pie chart showing the breakdown of all food listings by status
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={400}>
+                  <PieChart>
+                    <Pie
+                      data={getStatusDistribution()}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) =>
+                        `${name} ${(percent * 100).toFixed(0)}%`
+                      }
+                      outerRadius={150}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {getStatusDistribution().map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        {/* Top Performing Events */}
+        {overallStats && overallStats.topPerformingEvents.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Top Performing Events</CardTitle>
+              <CardDescription>
+                Events with the highest food pickup efficiency
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {overallStats.topPerformingEvents.map((event, index) => (
+                  <div
+                    key={event.id}
+                    className="flex items-center justify-between p-4 border rounded-lg"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center font-bold">
+                        {index + 1}
+                      </div>
+                      <div>
+                        <div className="font-semibold">{event.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {event.date}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-green-600">
+                        {event.efficiency}%
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {event.pickedUpQuantity} kg picked up
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Event Details Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Event Details</CardTitle>
+            <CardDescription>
+              Comprehensive breakdown of all events and their performance
+              <br />
+              <span className="text-xs text-muted-foreground">
+                Quantities are parsed from strings (e.g., "50 plates" → 10kg
+                estimated)
+              </span>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-2 text-foreground font-medium">
+                      Event
+                    </th>
+                    <th className="text-left p-2 text-foreground font-medium">
+                      Date
+                    </th>
+                    <th className="text-left p-2 text-foreground font-medium">
+                      Status
+                    </th>
+                    <th className="text-left p-2 text-foreground font-medium">
+                      Listings
+                    </th>
+                    <th className="text-left p-2 text-foreground font-medium">
+                      Food Saved (g)
+                    </th>
+                    <th className="text-left p-2 text-foreground font-medium">
+                      Picked Up (g)
+                    </th>
+                    <th className="text-left p-2 text-foreground font-medium">
+                      Efficiency
+                    </th>
+                    <th className="text-left p-2 text-foreground font-medium">
+                      Raw Data
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {events.map((event) => (
+                    <tr
+                      key={event.id}
+                      className="border-b hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                    >
+                      <td className="p-2 font-medium text-foreground">
+                        {event.name}
+                      </td>
+                      <td className="p-2 text-foreground">{event.date}</td>
+                      <td className="p-2">
+                        <Badge
+                          variant={
+                            event.status === "completed"
+                              ? "default"
+                              : event.status === "ongoing"
+                              ? "secondary"
+                              : "outline"
+                          }
+                        >
+                          {event.status}
+                        </Badge>
+                      </td>
+                      <td className="p-2 text-foreground">
+                        {event.totalListings}
+                      </td>
+                      <td className="p-2 text-foreground">
+                        {event.totalQuantity > 0
+                          ? `${(event.totalQuantity / 1000).toFixed(1)} kg`
+                          : "0 kg"}
+                      </td>
+                      <td className="p-2 text-foreground">
+                        {event.pickedUpQuantity > 0
+                          ? `${(event.pickedUpQuantity / 1000).toFixed(1)} kg`
+                          : "0 kg"}
+                      </td>
+                      <td className="p-2">
+                        <span
+                          className={`font-semibold ${
+                            event.efficiency >= 80
+                              ? "text-green-600 dark:text-green-400"
+                              : event.efficiency >= 60
+                              ? "text-yellow-600 dark:text-yellow-400"
+                              : "text-red-600 dark:text-red-400"
+                          }`}
+                        >
+                          {event.efficiency}%
+                        </span>
+                      </td>
+                      <td className="p-2 text-xs text-muted-foreground">
+                        <div
+                          className="max-w-32 truncate"
+                          title={event.rawQuantities.join(", ")}
+                        >
+                          {event.rawQuantities.length > 0
+                            ? event.rawQuantities.join(", ")
+                            : "No data"}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </AuthGuard>
   );
 }

@@ -152,12 +152,32 @@ export default function CanteenDashboard() {
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Helper function to check if a food item has expired
+  const isExpired = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return false;
+      }
+      return date < new Date();
+    } catch (error) {
+      return false;
+    }
+  };
+
   // Get canteen's food listings (filtered by user_id in real implementation)
   const canteenListings = foodListings;
 
   // Create sorted listings for display
   const sortedListings = [...canteenListings].sort((a, b) => {
-    // Apply user-selected sorting
+    // Always show expired foods at the bottom regardless of sorting
+    const aExpired = isExpired(a.expires);
+    const bExpired = isExpired(b.expires);
+
+    if (aExpired && !bExpired) return 1;
+    if (!aExpired && bExpired) return -1;
+
+    // Apply user-selected sorting for non-expired foods
     switch (sortConfig.key) {
       case "name":
         return sortConfig.direction === "asc"
@@ -382,18 +402,6 @@ export default function CanteenDashboard() {
       });
     } catch (error) {
       return "Invalid Date";
-    }
-  };
-
-  const isExpired = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) {
-        return false;
-      }
-      return date < new Date();
-    } catch (error) {
-      return false;
     }
   };
 
@@ -788,116 +796,239 @@ export default function CanteenDashboard() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {sortedListings.map((listing, index) => (
-                            <TableRow
-                              key={listing.id}
-                              className={`${
-                                isExpired(listing.expires)
-                                  ? "bg-red-500/10 border-l-4 border-l-red-500"
-                                  : ""
-                              }                               ${
-                                index % 2 === 0
-                                  ? "bg-background hover:bg-muted"
-                                  : "bg-muted hover:bg-muted/80"
-                              } transition-all duration-200 hover:shadow-sm`}
-                            >
-                              <TableCell className="font-medium py-3">
-                                {listing.name}
-                              </TableCell>
-                              <TableCell className="py-3">
-                                {listing.quantity}
-                              </TableCell>
-                              <TableCell className="py-3">
-                                {listing.eventId ? (
-                                  <div className="flex items-center gap-2">
-                                    <Calendar className="h-4 w-4 text-blue-600" />
-                                    <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
-                                      {availableEvents.find(
-                                        (e) => e.id === listing.eventId
-                                      )?.name || "Unknown Event"}
-                                    </span>
-                                  </div>
-                                ) : (
-                                  <span className="text-sm text-muted-foreground italic">
-                                    No event
-                                  </span>
+                          {(() => {
+                            const nonExpiredListings = sortedListings.filter(
+                              (listing) => !isExpired(listing.expires)
+                            );
+                            const expiredListings = sortedListings.filter(
+                              (listing) => isExpired(listing.expires)
+                            );
+
+                            return (
+                              <>
+                                {/* Non-expired listings */}
+                                {nonExpiredListings.map((listing, index) => (
+                                  <TableRow
+                                    key={listing.id}
+                                    className={`${
+                                      index % 2 === 0
+                                        ? "bg-background hover:bg-muted"
+                                        : "bg-muted hover:bg-muted/80"
+                                    } transition-all duration-200 hover:shadow-sm`}
+                                  >
+                                    <TableCell className="font-medium py-3">
+                                      {listing.name}
+                                    </TableCell>
+                                    <TableCell className="py-3">
+                                      {listing.quantity}
+                                    </TableCell>
+                                    <TableCell className="py-3">
+                                      {listing.eventId ? (
+                                        <div className="flex items-center gap-2">
+                                          <Calendar className="h-4 w-4 text-blue-600" />
+                                          <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                                            {availableEvents.find(
+                                              (e) => e.id === listing.eventId
+                                            )?.name || "Unknown Event"}
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <span className="text-sm text-muted-foreground italic">
+                                          No event
+                                        </span>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="py-3">
+                                      <div className="flex items-center gap-2">
+                                        <MapPin className="h-4 w-4 text-foreground" />
+                                        {listing.pickupLocation ||
+                                          "Not specified"}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="py-3">
+                                      <div className="flex items-center gap-2">
+                                        <Clock className="h-4 w-4 text-foreground" />
+                                        <span
+                                          className={
+                                            isExpired(listing.expires)
+                                              ? "text-red-600 font-medium"
+                                              : ""
+                                          }
+                                        >
+                                          {formatExpiryDate(listing.expires)}
+                                        </span>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="py-3">
+                                      <div className="flex items-center gap-2">
+                                        {getStatusIcon(listing.status)}
+                                        {getStatusBadge(listing.status)}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="py-3">
+                                      {listing.safetyRating ||
+                                      listing.temperature ||
+                                      (listing.allergens &&
+                                        listing.allergens.length > 0) ? (
+                                        <FoodSafetyTags
+                                          temperature={listing.temperature}
+                                          allergens={listing.allergens}
+                                          preparationMethod={
+                                            listing.preparationMethod
+                                          }
+                                          safetyRating={listing.safetyRating}
+                                          storageConditions={
+                                            listing.storageConditions
+                                          }
+                                        />
+                                      ) : (
+                                        <span className="text-foreground text-sm italic">
+                                          No safety data
+                                        </span>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="py-3">
+                                      <div className="flex items-center justify-center gap-2">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => {
+                                            setEditingListing(listing);
+                                            setIsEditDialogOpen(true);
+                                          }}
+                                          className="h-8 w-8 p-0 hover:bg-primary/10 hover:scale-105 transition-all duration-200 group"
+                                        >
+                                          <Edit className="h-4 w-4 group-hover:text-primary transition-colors duration-200" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() =>
+                                            handleDeleteListing(listing.id)
+                                          }
+                                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-500/10 hover:scale-105 transition-all duration-200 group"
+                                        >
+                                          <Trash2 className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+
+                                {/* Expired listings section header */}
+                                {expiredListings.length > 0 && (
+                                  <TableRow className="bg-red-50 border-l-4 border-l-red-500">
+                                    <TableCell colSpan={8} className="py-3">
+                                      <div className="flex items-center gap-2 text-red-700 font-medium">
+                                        <AlertTriangle className="h-4 w-4" />
+                                        Expired Food Items (Shown at bottom for
+                                        reference)
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
                                 )}
-                              </TableCell>
-                              <TableCell className="py-3">
-                                <div className="flex items-center gap-2">
-                                  <MapPin className="h-4 w-4 text-foreground" />
-                                  {listing.pickupLocation || "Not specified"}
-                                </div>
-                              </TableCell>
-                              <TableCell className="py-3">
-                                <div className="flex items-center gap-2">
-                                  <Clock className="h-4 w-4 text-foreground" />
-                                  <span
-                                    className={
-                                      isExpired(listing.expires)
-                                        ? "text-red-600 font-medium"
-                                        : ""
-                                    }
+
+                                {/* Expired listings */}
+                                {expiredListings.map((listing, index) => (
+                                  <TableRow
+                                    key={listing.id}
+                                    className="bg-red-500/10 border-l-4 border-l-red-500 hover:bg-red-500/20 transition-all duration-200"
                                   >
-                                    {formatExpiryDate(listing.expires)}
-                                  </span>
-                                </div>
-                              </TableCell>
-                              <TableCell className="py-3">
-                                <div className="flex items-center gap-2">
-                                  {getStatusIcon(listing.status)}
-                                  {getStatusBadge(listing.status)}
-                                </div>
-                              </TableCell>
-                              <TableCell className="py-3">
-                                {listing.safetyRating ||
-                                listing.temperature ||
-                                (listing.allergens &&
-                                  listing.allergens.length > 0) ? (
-                                  <FoodSafetyTags
-                                    temperature={listing.temperature}
-                                    allergens={listing.allergens}
-                                    preparationMethod={
-                                      listing.preparationMethod
-                                    }
-                                    safetyRating={listing.safetyRating}
-                                    storageConditions={
-                                      listing.storageConditions
-                                    }
-                                  />
-                                ) : (
-                                  <span className="text-foreground text-sm italic">
-                                    No safety data
-                                  </span>
-                                )}
-                              </TableCell>
-                              <TableCell className="py-3">
-                                <div className="flex items-center justify-center gap-2">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => {
-                                      setEditingListing(listing);
-                                      setIsEditDialogOpen(true);
-                                    }}
-                                    className="h-8 w-8 p-0 hover:bg-primary/10 hover:scale-105 transition-all duration-200 group"
-                                  >
-                                    <Edit className="h-4 w-4 group-hover:text-primary transition-colors duration-200" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() =>
-                                      handleDeleteListing(listing.id)
-                                    }
-                                    className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-500/10 hover:scale-105 transition-all duration-200 group"
-                                  >
-                                    <Trash2 className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))}
+                                    <TableCell className="font-medium py-3">
+                                      {listing.name}
+                                    </TableCell>
+                                    <TableCell className="py-3">
+                                      {listing.quantity}
+                                    </TableCell>
+                                    <TableCell className="py-3">
+                                      {listing.eventId ? (
+                                        <div className="flex items-center gap-2">
+                                          <Calendar className="h-4 w-4 text-blue-600" />
+                                          <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                                            {availableEvents.find(
+                                              (e) => e.id === listing.eventId
+                                            )?.name || "Unknown Event"}
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <span className="text-sm text-muted-foreground italic">
+                                          No event
+                                        </span>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="py-3">
+                                      <div className="flex items-center gap-2">
+                                        <MapPin className="h-4 w-4 text-foreground" />
+                                        {listing.pickupLocation ||
+                                          "Not specified"}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="py-3">
+                                      <div className="flex items-center gap-2">
+                                        <Clock className="h-4 w-4 text-foreground" />
+                                        <span className="text-red-600 font-medium">
+                                          {formatExpiryDate(listing.expires)}
+                                        </span>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="py-3">
+                                      <div className="flex items-center gap-2">
+                                        {getStatusIcon(listing.status)}
+                                        {getStatusBadge(listing.status)}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="py-3">
+                                      {listing.safetyRating ||
+                                      listing.temperature ||
+                                      (listing.allergens &&
+                                        listing.allergens.length > 0) ? (
+                                        <FoodSafetyTags
+                                          temperature={listing.temperature}
+                                          allergens={listing.allergens}
+                                          preparationMethod={
+                                            listing.preparationMethod
+                                          }
+                                          safetyRating={listing.safetyRating}
+                                          storageConditions={
+                                            listing.storageConditions
+                                          }
+                                        />
+                                      ) : (
+                                        <span className="text-foreground text-sm italic">
+                                          No safety data
+                                        </span>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="py-3">
+                                      <div className="flex items-center justify-center gap-2">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => {
+                                            setEditingListing(listing);
+                                            setIsEditDialogOpen(true);
+                                          }}
+                                          className="h-8 w-8 p-0 hover:bg-primary/10 hover:scale-105 transition-all duration-200 group"
+                                        >
+                                          <Edit className="h-4 w-4 group-hover:text-primary transition-colors duration-200" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() =>
+                                            handleDeleteListing(listing.id)
+                                          }
+                                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-500/10 hover:scale-105 transition-all duration-200 group"
+                                        >
+                                          <Trash2 className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </>
+                            );
+                          })()}
                         </TableBody>
                       </Table>
 
