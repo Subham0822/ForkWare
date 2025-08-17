@@ -827,9 +827,8 @@ export default function CanteenDashboard() {
                                         <div className="flex items-center gap-2">
                                           <Calendar className="h-4 w-4 text-blue-600" />
                                           <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
-                                            {availableEvents.find(
-                                              (e) => e.id === listing.eventId
-                                            )?.name || "Unknown Event"}
+                                            {listing.eventName ||
+                                              "Unknown Event"}
                                           </span>
                                         </div>
                                       ) : (
@@ -945,9 +944,8 @@ export default function CanteenDashboard() {
                                         <div className="flex items-center gap-2">
                                           <Calendar className="h-4 w-4 text-blue-600" />
                                           <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
-                                            {availableEvents.find(
-                                              (e) => e.id === listing.eventId
-                                            )?.name || "Unknown Event"}
+                                            {listing.eventName ||
+                                              "Unknown Event"}
                                           </span>
                                         </div>
                                       ) : (

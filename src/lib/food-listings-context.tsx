@@ -12,7 +12,7 @@ import {
   getFoodListings,
   updateFoodListing as updateFoodListingDB,
   deleteFoodListing as deleteFoodListingDB,
-  FoodListing as DBFoodListing,
+  FoodListingWithEvent as DBFoodListing,
 } from "./database";
 import { supabase } from "./supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -37,6 +37,10 @@ export interface FoodListing {
   safetyRating?: number; // 1-5 scale
   storageConditions?: string;
   lastInspection?: string;
+  // Event information
+  eventName?: string;
+  eventVenue?: string;
+  eventDate?: string;
 }
 
 interface FoodListingsContextType {
@@ -83,6 +87,10 @@ const convertDBToListing = (dbListing: DBFoodListing): FoodListing => {
     safetyRating: dbListing.safety_rating,
     storageConditions: dbListing.storage_conditions,
     lastInspection: dbListing.last_inspection,
+    // Event information
+    eventName: dbListing.events?.name,
+    eventVenue: dbListing.events?.venue,
+    eventDate: dbListing.events?.date,
   };
 };
 
@@ -92,8 +100,12 @@ const getCurrentUserId = async (): Promise<string> => {
     // Try to get from custom JWT session first
     const { getSession } = await import("@/app/actions/auth-supabase");
     const customSession = await getSession();
-    if (customSession?.user?.id) {
-      return customSession.user.id;
+    // Fix: Ensure customSession.user is typed as an object with an optional id property
+    const userId = (customSession?.user && typeof customSession.user === "object" && "id" in customSession.user)
+      ? (customSession.user as { id?: string }).id
+      : undefined;
+    if (userId) {
+      return userId;
     }
 
     // Fallback to Supabase session
@@ -193,13 +205,15 @@ export function FoodListingsProvider({ children }: { children: ReactNode }) {
       });
     } catch (error) {
       console.error("Failed to add food listing:", error);
-      console.error("Error details:", {
-        name: error?.name,
-        message: error?.message,
-        code: error?.code,
-        details: error?.details,
-        hint: error?.hint,
-      });
+      if (typeof error === "object" && error !== null) {
+        console.error("Error details:", {
+          name: (error as any).name,
+          message: (error as any).message,
+          code: (error as any).code,
+          details: (error as any).details,
+          hint: (error as any).hint,
+        });
+      }
 
       // More specific error messages
       let errorMessage = "Failed to add food listing.";

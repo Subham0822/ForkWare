@@ -32,6 +32,16 @@ export interface FoodListing {
   event_id?: string;
 }
 
+// FoodListing with joined event information
+export interface FoodListingWithEvent extends FoodListing {
+  events?: {
+    id: string;
+    name: string;
+    venue: string;
+    date: string;
+  } | null;
+}
+
 export interface Event {
   id: string;
   name: string;
@@ -225,7 +235,9 @@ export async function createFoodListing(
   return data;
 }
 
-export async function getFoodListings(status?: string) {
+export async function getFoodListings(
+  status?: string
+): Promise<FoodListingWithEvent[]> {
   let query = supabase
     .from("food_listings")
     .select(
@@ -243,7 +255,43 @@ export async function getFoodListings(status?: string) {
   const { data, error } = await query;
 
   if (error) throw error;
-  return data;
+
+  // Since Supabase doesn't support the JOIN syntax we were trying to use,
+  // we'll fetch event information separately and combine it
+  if (data && data.length > 0) {
+    const eventIds = data
+      .map((listing) => listing.event_id)
+      .filter((id) => id) // Remove undefined/null values
+      .filter((id, index, arr) => arr.indexOf(id) === index); // Remove duplicates
+
+    if (eventIds.length > 0) {
+      const { data: events, error: eventsError } = await supabase
+        .from("events")
+        .select("id, name, venue, date")
+        .in("id", eventIds);
+
+      if (!eventsError && events) {
+        // Create a map for quick lookup
+        const eventsMap = new Map(events.map((event) => [event.id, event]));
+
+        // Combine the data
+        const enrichedData = data.map((listing) => ({
+          ...listing,
+          events: listing.event_id
+            ? eventsMap.get(listing.event_id) || null
+            : null,
+        }));
+
+        return enrichedData;
+      }
+    }
+  }
+
+  // Return data with null events if no events found or error occurred
+  return data.map((listing) => ({
+    ...listing,
+    events: null,
+  }));
 }
 
 export async function updateFoodListing(
@@ -349,7 +397,9 @@ export async function getUpcomingEvents() {
   return data;
 }
 
-export async function getFoodListingsByEvent(eventId: string) {
+export async function getFoodListingsByEvent(
+  eventId: string
+): Promise<FoodListingWithEvent[]> {
   const { data, error } = await supabase
     .from("food_listings")
     .select(
@@ -362,7 +412,32 @@ export async function getFoodListingsByEvent(eventId: string) {
     .order("created_at", { ascending: false });
 
   if (error) throw error;
-  return data;
+
+  // Since we're filtering by event_id, we know all listings belong to the same event
+  // We can fetch the event information once and apply it to all listings
+  if (data && data.length > 0) {
+    const { data: event, error: eventError } = await supabase
+      .from("events")
+      .select("id, name, venue, date")
+      .eq("id", eventId)
+      .single();
+
+    if (!eventError && event) {
+      // Apply the event information to all listings
+      const enrichedData = data.map((listing) => ({
+        ...listing,
+        events: event,
+      }));
+
+      return enrichedData;
+    }
+  }
+
+  // Return data with null events if no event found or error occurred
+  return data.map((listing) => ({
+    ...listing,
+    events: null,
+  }));
 }
 
 // --------------- Event Integration helpers ---------------
