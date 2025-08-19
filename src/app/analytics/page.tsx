@@ -51,6 +51,10 @@ interface EventAnalytics {
   mealsServedEstimate: number;
   efficiency: number; // percentage of food picked up
   rawQuantities: string[]; // Store original quantity strings for debugging
+  carbonSavedKgCO2e: number; // estimated avoided emissions from picked up food
+  waterSavedLiters: number; // estimated avoided water use from picked up food
+  carbonWastedKgCO2e: number; // estimated emissions embedded in expired food
+  waterWastedLiters: number; // estimated water embedded in expired food
 }
 
 interface OverallStats {
@@ -60,6 +64,8 @@ interface OverallStats {
   totalMealsServed: number;
   averageEfficiency: number;
   topPerformingEvents: EventAnalytics[];
+  totalCarbonSavedKgCO2e: number;
+  totalWaterSavedLiters: number;
 }
 
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
@@ -115,6 +121,40 @@ function parseQuantity(quantityStr: string): number {
   return 0;
 }
 
+// Heuristic factors for carbon and water footprints per kg by food name keywords
+function getFootprintFactorsForName(foodName: string): {
+  co2ePerKg: number;
+  waterPerKg: number;
+} {
+  const name = (foodName || "").toLowerCase();
+  // Default for mixed cooked meals
+  let co2ePerKg = 2.5; // kg CO2e per kg
+  let waterPerKg = 1000; // liters per kg
+
+  const set = (co2: number, water: number) => {
+    co2ePerKg = co2;
+    waterPerKg = water;
+  };
+
+  if (/(beef|mutton|steak|buff)/.test(name)) set(60, 15000);
+  else if (/(lamb|goat)/.test(name)) set(24, 10000);
+  else if (/(pork|bacon|ham)/.test(name)) set(7, 6000);
+  else if (/(chicken|poultry|turkey)/.test(name)) set(6, 4300);
+  else if (/(fish|tuna|salmon|seafood)/.test(name)) set(5, 3000);
+  else if (/(cheese)/.test(name)) set(13.5, 5000);
+  else if (/(dairy|milk|yogurt|curd|paneer)/.test(name)) set(3, 1000);
+  else if (/(egg|omelette)/.test(name)) set(4.5, 3300);
+  else if (/(rice|biryani|pulao)/.test(name)) set(4, 2500);
+  else if (/(wheat|roti|bread|pasta|noodle|chapati)/.test(name)) set(1.3, 1800);
+  else if (/(bean|lentil|dal|legume|chickpea|chole|rajma)/.test(name)) set(0.9, 4000);
+  else if (/(potato|aloo)/.test(name)) set(0.3, 287);
+  else if (/(vegetable|veg|salad|greens|sabzi|bhaji|spinach|carrot|cabbage)/.test(name)) set(0.5, 300);
+  else if (/(fruit|banana|apple|orange|mango|grape)/.test(name)) set(0.8, 800);
+  else if (/(snack|samosa|pakora|chips|pastry|dessert|sweet)/.test(name)) set(2.0, 1000);
+
+  return { co2ePerKg, waterPerKg };
+}
+
 export default function AnalyticsPage() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -138,25 +178,46 @@ export default function AnalyticsPage() {
       let totalListings = 0;
       let totalFoodSaved = 0;
       let totalMealsServed = 0;
+      let totalCarbonSavedKgCO2e = 0;
+      let totalWaterSavedLiters = 0;
 
       for (const event of allEvents) {
         try {
           const summary = await getEventSummary(event.id);
 
-          // Get raw quantity data for debugging
+          // Get listing-level data for footprint calculations and debugging
           const rawQuantities: string[] = [];
+          let carbonSavedKgCO2e = 0;
+          let waterSavedLiters = 0;
+          let carbonWastedKgCO2e = 0;
+          let waterWastedLiters = 0;
           try {
             const { data: listings } = await supabase
               .from("food_listings")
-              .select("quantity")
+              .select("quantity, status, food_name")
               .eq("event_id", event.id);
 
             if (listings) {
-              rawQuantities.push(...listings.map((l) => l.quantity || "0"));
+              for (const l of listings as Array<{ quantity: string; status: string; food_name: string }>) {
+                const grams = parseQuantity(l.quantity || "0");
+                rawQuantities.push(l.quantity || "0");
+                if (grams <= 0) continue;
+                const kg = grams / 1000;
+                const { co2ePerKg, waterPerKg } = getFootprintFactorsForName(l.food_name || "");
+                const itemCarbon = kg * co2ePerKg;
+                const itemWater = kg * waterPerKg;
+                if (l.status === "picked_up") {
+                  carbonSavedKgCO2e += itemCarbon;
+                  waterSavedLiters += itemWater;
+                } else if (l.status === "expired") {
+                  carbonWastedKgCO2e += itemCarbon;
+                  waterWastedLiters += itemWater;
+                }
+              }
             }
           } catch (error) {
             console.warn(
-              `Could not fetch raw quantities for event ${event.id}:`,
+              `Could not fetch listing details for event ${event.id}:`,
               error
             );
           }
@@ -191,6 +252,10 @@ export default function AnalyticsPage() {
                 ? Math.round((parsedPickedUp / parsedTotal) * 100)
                 : 0,
             rawQuantities,
+            carbonSavedKgCO2e,
+            waterSavedLiters,
+            carbonWastedKgCO2e,
+            waterWastedLiters,
           };
 
           eventAnalytics.push(analytics);
@@ -198,6 +263,8 @@ export default function AnalyticsPage() {
           totalListings += summary.totals.totalListings;
           totalFoodSaved += summary.quantities.total;
           totalMealsServed += summary.mealsServedEstimate;
+          totalCarbonSavedKgCO2e += carbonSavedKgCO2e;
+          totalWaterSavedLiters += waterSavedLiters;
         } catch (error) {
           console.error(`Error getting summary for event ${event.id}:`, error);
         }
@@ -220,6 +287,8 @@ export default function AnalyticsPage() {
               )
             : 0,
         topPerformingEvents: eventAnalytics.slice(0, 5),
+        totalCarbonSavedKgCO2e,
+        totalWaterSavedLiters,
       };
 
       setEvents(eventAnalytics);
@@ -255,6 +324,14 @@ export default function AnalyticsPage() {
       ),
       averageEfficiency: Math.round(
         filtered.reduce((sum, e) => sum + e.efficiency, 0) / filtered.length
+      ),
+      totalCarbonSavedKgCO2e: filtered.reduce(
+        (sum, e) => sum + e.carbonSavedKgCO2e,
+        0
+      ),
+      totalWaterSavedLiters: filtered.reduce(
+        (sum, e) => sum + e.waterSavedLiters,
+        0
       ),
     };
   };
@@ -358,7 +435,7 @@ export default function AnalyticsPage() {
 
         {/* Overall Stats */}
         {overallStats && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
@@ -430,6 +507,42 @@ export default function AnalyticsPage() {
                 </p>
               </CardContent>
             </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Total Carbon Saved
+                </CardTitle>
+                <Badge variant="secondary">
+                  {overallStats.totalCarbonSavedKgCO2e.toFixed(1)} kg CO₂e
+                </Badge>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {(overallStats.totalCarbonSavedKgCO2e / 1000).toFixed(2)} t
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Estimated CO₂e avoided via redistribution
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Total Water Saved
+                </CardTitle>
+                <Badge variant="secondary">
+                  {(overallStats.totalWaterSavedLiters / 1000).toFixed(1)} kL
+                </Badge>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {(overallStats.totalWaterSavedLiters / 1000000).toFixed(2)} ML
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Estimated freshwater use avoided
+                </p>
+              </CardContent>
+            </Card>
           </div>
         )}
 
@@ -447,7 +560,7 @@ export default function AnalyticsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+              <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-center">
                 <div>
                   <div className="text-2xl font-bold">
                     {filteredStats.totalEvents}
@@ -474,6 +587,22 @@ export default function AnalyticsPage() {
                   </div>
                   <div className="text-sm text-muted-foreground">
                     Efficiency
+                  </div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">
+                    {filteredStats.totalCarbonSavedKgCO2e.toFixed(1)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Carbon Saved (kg CO₂e)
+                  </div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">
+                    {(filteredStats.totalWaterSavedLiters / 1000).toFixed(1)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Water Saved (kL)
                   </div>
                 </div>
               </div>
@@ -652,6 +781,12 @@ export default function AnalyticsPage() {
                       Efficiency
                     </th>
                     <th className="text-left p-2 text-foreground font-medium">
+                      Carbon Saved (kg CO₂e)
+                    </th>
+                    <th className="text-left p-2 text-foreground font-medium">
+                      Water Saved (kL)
+                    </th>
+                    <th className="text-left p-2 text-foreground font-medium">
                       Raw Data
                     </th>
                   </tr>
@@ -704,6 +839,16 @@ export default function AnalyticsPage() {
                         >
                           {event.efficiency}%
                         </span>
+                      </td>
+                      <td className="p-2 text-foreground">
+                        {event.carbonSavedKgCO2e > 0
+                          ? event.carbonSavedKgCO2e.toFixed(1)
+                          : "0.0"}
+                      </td>
+                      <td className="p-2 text-foreground">
+                        {event.waterSavedLiters > 0
+                          ? (event.waterSavedLiters / 1000).toFixed(1)
+                          : "0.0"}
                       </td>
                       <td className="p-2 text-xs text-muted-foreground">
                         <div

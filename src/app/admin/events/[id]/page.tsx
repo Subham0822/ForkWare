@@ -246,15 +246,25 @@ export default function EventDetailPage() {
     if (eventId) loadSummary();
   }, [eventId, listings.length]);
 
-  // Auto-refresh listings every 30 seconds for live monitoring
+  // Auto-refresh listings every 30 seconds for live monitoring (only when tab is visible)
   useEffect(() => {
     const interval = setInterval(() => {
-      if (event && event.status === "ongoing") {
+      if (document.visibilityState === "visible" && event && event.status === "ongoing") {
         load();
       }
     }, 30000);
 
-    return () => clearInterval(interval);
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible" && event && event.status === "ongoing") {
+        load();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, [event, load]);
 
   if (loading) {

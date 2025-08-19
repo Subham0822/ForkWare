@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { getSession } from "@/app/actions/auth-supabase";
 import { usePathname, useRouter } from "next/navigation";
 import { jwtDecode } from "jwt-decode";
@@ -26,8 +26,13 @@ export function useUser() {
   const router = useRouter();
   const pathname = usePathname();
 
+  const isFirstFetchRef = useRef(true);
+
   const fetchUser = useCallback(async () => {
-    setLoading(true);
+    // Only show the global loading state on the first fetch
+    if (isFirstFetchRef.current) {
+      setLoading(true);
+    }
 
     // Add a timeout to prevent infinite loading
     const timeoutId = setTimeout(() => {
@@ -51,7 +56,10 @@ export function useUser() {
       setUser(null);
     } finally {
       clearTimeout(timeoutId);
-      setLoading(false);
+      if (isFirstFetchRef.current) {
+        setLoading(false);
+        isFirstFetchRef.current = false;
+      }
     }
   }, []);
 
@@ -81,13 +89,26 @@ export function useUser() {
     window.addEventListener("logout", handleLogout);
     window.addEventListener("login", handleLogin);
 
-    // Set up periodic session check (every 30 seconds)
-    const interval = setInterval(fetchUser, 30000);
+    // Refresh session when tab becomes visible
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchUser();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    // Set up periodic session check (every 5 minutes, only when visible)
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        fetchUser();
+      }
+    }, 300000);
 
     return () => {
       window.removeEventListener("storage", handleStorageChange);
       window.removeEventListener("logout", handleLogout);
       window.removeEventListener("login", handleLogin);
+      document.removeEventListener("visibilitychange", handleVisibility);
       clearInterval(interval);
     };
   }, [fetchUser]);
