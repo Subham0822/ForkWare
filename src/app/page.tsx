@@ -116,7 +116,7 @@ export default function Home() {
           <div className="relative h-64 md:h-96 group">
             <div className="absolute inset-0 bg-gradient-primary rounded-2xl opacity-20 blur-xl group-hover:opacity-30 transition-opacity duration-500"></div>
             <Image
-              src="https://placehold.co/600x400.png"
+              src="https://images.unsplash.com/photo-1668275057553-885fd9bb2b45?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
               alt="Community sharing food"
               fill
               className="rounded-2xl object-cover shadow-2xl transform transition-all duration-500 hover:scale-105 hover:shadow-glow-lg"

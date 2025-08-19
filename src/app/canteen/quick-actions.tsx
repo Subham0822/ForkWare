@@ -52,7 +52,11 @@ const commonFoodItems = [
   { name: "Cooked Food", type: "cooked", defaultQuantity: "10 meals" },
 ];
 
-export default function QuickActions() {
+interface QuickActionsProps {
+  onGoToEvents?: () => void;
+}
+
+export default function QuickActions({ onGoToEvents }: QuickActionsProps) {
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isBulkAddOpen, setIsBulkAddOpen] = useState(false);
   const [selectedFoodItems, setSelectedFoodItems] = useState<QuickFoodItem[]>(
@@ -166,12 +170,16 @@ export default function QuickActions() {
           <CardContent>
             <Button
               onClick={() => {
-                // Switch to events tab
+                if (onGoToEvents) {
+                  onGoToEvents();
+                  return;
+                }
+                // Fallback: attempt DOM switch if parent handler not provided
                 const tabsList = document.querySelector('[role="tablist"]');
-                const eventsTab = tabsList?.querySelector(
-                  '[value="events"]'
-                ) as HTMLElement;
-                if (eventsTab) eventsTab.click();
+                const eventsTab = tabsList?.querySelector('[value="events"]') as HTMLElement | null;
+                if (eventsTab) {
+                  eventsTab.click();
+                }
               }}
               className="w-full"
               variant="outline"

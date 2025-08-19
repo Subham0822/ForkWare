@@ -69,6 +69,7 @@ import {
   getEventPrefillExpiryDate,
   type Event as DBEvent,
 } from "@/lib/database";
+import { supabase } from "@/lib/supabase";
 
 interface CanteenStats {
   totalListings: number;
@@ -115,6 +116,7 @@ export default function CanteenDashboard() {
     description: "",
     foodType: "",
     safeUntil: "",
+    imageUrl: "",
   });
 
   // Event integration: fetch ongoing/upcoming events and allow attachment
@@ -139,6 +141,195 @@ export default function CanteenDashboard() {
     safetyRating: undefined as number | undefined,
     storageConditions: "",
   });
+
+  const [aiScan, setAiScan] = useState<
+    | {
+        spoilageRiskScore: number;
+        riskLevel: "Low" | "Medium" | "High" | "Critical";
+        reasons: string[];
+        recommendedAction: string;
+        safeByHours?: number;
+        suspiciousSigns?: string[];
+      }
+    | null
+  >(null);
+  const [isScanning, setIsScanning] = useState(false);
+
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+
+  // Edit dialog image state
+  const [editSelectedImage, setEditSelectedImage] = useState<File | null>(null);
+  const [editIsUploadingImage, setEditIsUploadingImage] = useState(false);
+  const [editImageUrl, setEditImageUrl] = useState<string>("");
+
+  const handleImageUpload = async () => {
+    try {
+      if (!selectedImage) {
+        toast({
+          title: "No image selected",
+          description: "Choose an image file to upload.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setIsUploadingImage(true);
+      const extFromType = selectedImage.type?.split("/")[1] || "jpg";
+      const unique = (typeof crypto !== "undefined" && (crypto as any).randomUUID)
+        ? (crypto as any).randomUUID()
+        : Math.random().toString(36).slice(2);
+      const fileName = `${unique}-${Date.now()}.${extFromType}`;
+      const path = `listings/${fileName}`;
+      const { error } = await supabase.storage
+        .from("food-images")
+        .upload(path, selectedImage, {
+          contentType: selectedImage.type || "image/jpeg",
+          upsert: false,
+          cacheControl: "3600",
+        });
+      if (error) throw error;
+      const { data } = supabase.storage.from("food-images").getPublicUrl(path);
+      const publicUrl = data?.publicUrl;
+      if (!publicUrl) throw new Error("Failed to get public URL");
+      setNewListing((prev) => ({ ...prev, imageUrl: publicUrl }));
+      toast({ title: "Image uploaded", description: "Linked to this listing." });
+    } catch (e: any) {
+      toast({ title: "Upload failed", description: e?.message || "Please try again.", variant: "destructive" });
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  const handleEditImageUpload = async () => {
+    try {
+      if (!editSelectedImage) {
+        toast({
+          title: "No image selected",
+          description: "Choose an image file to upload.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setEditIsUploadingImage(true);
+      const extFromType = editSelectedImage.type?.split("/")[1] || "jpg";
+      const unique = (typeof crypto !== "undefined" && (crypto as any).randomUUID)
+        ? (crypto as any).randomUUID()
+        : Math.random().toString(36).slice(2);
+      const fileName = `${unique}-${Date.now()}.${extFromType}`;
+      const path = `listings/${fileName}`;
+      const { error } = await supabase.storage
+        .from("food-images")
+        .upload(path, editSelectedImage, {
+          contentType: editSelectedImage.type || "image/jpeg",
+          upsert: false,
+          cacheControl: "3600",
+        });
+      if (error) throw error;
+      const { data } = supabase.storage.from("food-images").getPublicUrl(path);
+      const publicUrl = data?.publicUrl;
+      if (!publicUrl) throw new Error("Failed to get public URL");
+      setEditImageUrl(publicUrl);
+      toast({ title: "Image uploaded", description: "Linked to this listing." });
+    } catch (e: any) {
+      toast({ title: "Upload failed", description: e?.message || "Please try again.", variant: "destructive" });
+    } finally {
+      setEditIsUploadingImage(false);
+    }
+  };
+
+  // Sync edit image URL when opening dialog
+  useEffect(() => {
+    if (editingListing) {
+      setEditImageUrl(editingListing.imageUrl || "");
+      setEditSelectedImage(null);
+      setEditIsUploadingImage(false);
+    }
+  }, [editingListing]);
+
+  const mapRiskToRating = (risk: string): number => {
+    if (risk === "Low") return 5;
+    if (risk === "Medium") return 3;
+    if (risk === "High") return 2;
+    return 1;
+  };
+
+  const runAISafetyScan = async () => {
+    if (!newListing.imageUrl) {
+      toast({
+        title: "Image URL required",
+        description: "Add an image URL to run AI safety scan.",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      setIsScanning(true);
+      setAiScan(null);
+      const res = await fetch("/api/ai/safety-scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageUrl: newListing.imageUrl,
+          temperature: safetyData.temperature,
+          preparationMethod: safetyData.preparationMethod,
+          quantity: newListing.quantity,
+          expiryDate: newListing.expiryDate,
+          foodName: newListing.foodName,
+        }),
+      });
+      if (!res.ok) {
+        throw new Error((await res.json()).error || "Scan failed");
+      }
+      const data = await res.json();
+      setAiScan(data);
+      setSafetyData((prev) => ({
+        ...prev,
+        safetyRating: mapRiskToRating(data.riskLevel),
+      }));
+      toast({
+        title: "AI Safety Scan complete",
+        description: `Risk: ${data.riskLevel} • Score: ${data.spoilageRiskScore}`,
+      });
+    } catch (e: any) {
+      toast({
+        title: "AI scan error",
+        description: e?.message || "Failed to run AI safety scan.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const runAISafetySuggest = async () => {
+    try {
+      const res = await fetch("/api/ai/suggest-safety", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          foodName: newListing.foodName,
+          description: newListing.description,
+          preparationMethod: safetyData.preparationMethod,
+          temperature: safetyData.temperature,
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Failed");
+      const data = await res.json();
+      setSafetyData((prev) => ({
+        ...prev,
+        safetyRating: data.safetyRating ?? prev.safetyRating,
+        storageConditions: data.storageConditions ?? prev.storageConditions,
+        allergens: Array.isArray(data.allergens) ? data.allergens : prev.allergens,
+      }));
+      if (data.notes) {
+        toast({ title: "Safety tips", description: data.notes });
+      } else {
+        toast({ title: "Safety suggestions applied" });
+      }
+    } catch (e: any) {
+      toast({ title: "AI error", description: e?.message || "Failed to suggest", variant: "destructive" });
+    }
+  };
 
   // Safety filter state
   const [safetyFilter, setSafetyFilter] = useState("all");
@@ -279,7 +470,7 @@ export default function CanteenDashboard() {
         expires: newListing.expiryDate,
         status: "Available",
         pickupLocation: newListing.pickupLocation,
-        imageUrl: "",
+        imageUrl: newListing.imageUrl,
         eventId: selectedEventId || undefined,
         // Food Safety Fields
         temperature: safetyData.temperature || undefined,
@@ -299,6 +490,7 @@ export default function CanteenDashboard() {
         description: "",
         foodType: "",
         safeUntil: "",
+        imageUrl: "",
       });
       // Reset safety data
       setSafetyData({
@@ -308,6 +500,7 @@ export default function CanteenDashboard() {
         safetyRating: undefined,
         storageConditions: "",
       });
+      setAiScan(null);
       setSelectedEventId("");
     } catch (error) {
       toast({
@@ -318,14 +511,45 @@ export default function CanteenDashboard() {
     }
   };
 
+  const runAIDescription = async () => {
+    try {
+      const res = await fetch("/api/ai/autofill-listing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          foodName: newListing.foodName,
+          quantity: newListing.quantity,
+          preparationMethod: safetyData.preparationMethod,
+          allergens: safetyData.allergens,
+          temperature: safetyData.temperature,
+          storageConditions: safetyData.storageConditions,
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Failed");
+      const data = await res.json();
+      setNewListing((prev) => ({
+        ...prev,
+        description: data.description || prev.description,
+        foodName: data.suggestedTitle || prev.foodName,
+      }));
+      toast({ title: "Description generated", description: "You can edit it before saving." });
+    } catch (e: any) {
+      toast({ title: "AI error", description: e?.message || "Failed to generate", variant: "destructive" });
+    }
+  };
+
   const handleEditListing = async () => {
     if (!editingListing) return;
 
     try {
       // Update the food listing using the context
-      await updateFoodListing(editingListing.id, {
+      const updates: Partial<FoodListing> = {
         status: editingListing.status,
-      });
+      };
+      if (editImageUrl && editImageUrl !== (editingListing.imageUrl || "")) {
+        updates.imageUrl = editImageUrl;
+      }
+      await updateFoodListing(editingListing.id, updates);
 
       setIsEditDialogOpen(false);
       setEditingListing(null);
@@ -555,7 +779,9 @@ export default function CanteenDashboard() {
           </ScrollStack>
 
           {/* Quick Actions Section */}
-          <QuickActions />
+          <div className="mt-6 md:mt-14">
+            <QuickActions onGoToEvents={() => setActiveTab("events")} />
+          </div>
 
           {/* Main Content Tabs */}
           <Tabs
@@ -914,18 +1140,7 @@ export default function CanteenDashboard() {
                                   </TableRow>
                                 ))}
 
-                                {/* Expired listings section header */}
-                                {expiredListings.length > 0 && (
-                                  <TableRow className="bg-red-50 border-l-4 border-l-red-500">
-                                    <TableCell colSpan={8} className="py-3">
-                                      <div className="flex items-center gap-2 text-red-700 font-medium">
-                                        <AlertTriangle className="h-4 w-4" />
-                                        Expired Food Items (Shown at bottom for
-                                        reference)
-                                      </div>
-                                    </TableCell>
-                                  </TableRow>
-                                )}
+                                
 
                                 {/* Expired listings */}
                                 {expiredListings.map((listing, index) => (
@@ -1505,6 +1720,39 @@ export default function CanteenDashboard() {
                   className="bg-background/80 backdrop-blur-sm border-border/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
                 />
               </div>
+              <div className="space-y-2">
+                <Label
+                  htmlFor="imageUrl"
+                  className="text-sm font-medium text-foreground"
+                >
+                  Image URL
+                </Label>
+                <Input
+                  id="imageUrl"
+                  value={newListing.imageUrl}
+                  onChange={(e) =>
+                    setNewListing({ ...newListing, imageUrl: e.target.value })
+                  }
+                  placeholder="https://..."
+                  className="bg-background/80 backdrop-blur-sm border-border/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
+                />
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setSelectedImage(e.target.files?.[0] || null)}
+                    className="bg-background/80 backdrop-blur-sm border-border/50"
+                  />
+                  <Button onClick={handleImageUpload} variant="outline" disabled={isUploadingImage || !selectedImage}>
+                    {isUploadingImage ? "Uploading..." : "Upload Image"}
+                  </Button>
+                </div>
+                {newListing.imageUrl && (
+                  <div className="pt-1">
+                    <img src={newListing.imageUrl} alt="Preview" className="h-24 w-24 object-cover rounded-md border" />
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -1524,6 +1772,11 @@ export default function CanteenDashboard() {
                 rows={3}
                 className="bg-background/80 backdrop-blur-sm border-border/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
               />
+              <div>
+                <Button variant="outline" size="sm" onClick={runAIDescription}>
+                  AI: Autofill Description
+                </Button>
+              </div>
             </div>
 
             {/* Food Safety Information */}
@@ -1543,6 +1796,23 @@ export default function CanteenDashboard() {
                 });
               }}
             />
+            <div className="flex items-start gap-3">
+              <Button onClick={runAISafetyScan} variant="outline" disabled={isScanning}>
+                {isScanning ? "Scanning..." : "Run AI Safety Scan"}
+              </Button>
+              <Button onClick={runAISafetySuggest} variant="outline">
+                AI: Suggest Safety Fields
+              </Button>
+              {aiScan && (
+                <div className="text-sm space-y-1">
+                  <div className="font-medium">Risk: {aiScan.riskLevel} (Score {aiScan.spoilageRiskScore})</div>
+                  <div className="text-foreground/80">{aiScan.recommendedAction}</div>
+                  {aiScan.reasons && aiScan.reasons.length > 0 && (
+                    <div className="text-foreground/70">Reasons: {aiScan.reasons.slice(0, 3).join(", ")}</div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           <DialogFooter className="gap-3">
             <Button
@@ -1604,6 +1874,34 @@ export default function CanteenDashboard() {
                     <SelectItem value="Expired">Expired</SelectItem>
                   </SelectContent>
                 </Select>
+
+                <div className="space-y-2 pt-2">
+                  <Label className="text-sm font-medium text-foreground">
+                    Listing Image
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="https://..."
+                      value={editImageUrl}
+                      onChange={(e) => setEditImageUrl(e.target.value)}
+                      className="bg-background/80 backdrop-blur-sm border-border/50"
+                    />
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setEditSelectedImage(e.target.files?.[0] || null)}
+                      className="bg-background/80 backdrop-blur-sm border-border/50"
+                    />
+                    <Button onClick={handleEditImageUpload} variant="outline" disabled={editIsUploadingImage || !editSelectedImage}>
+                      {editIsUploadingImage ? "Uploading..." : "Upload"}
+                    </Button>
+                  </div>
+                  {editImageUrl && (
+                    <div className="pt-1">
+                      <img src={editImageUrl} alt="Preview" className="h-24 w-24 object-cover rounded-md border" />
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

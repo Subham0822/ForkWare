@@ -26,6 +26,10 @@ export function Particles({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    // Capture non-null references for use inside inner class closures
+    const canvasEl = canvas as HTMLCanvasElement;
+    const ctxEl = ctx as CanvasRenderingContext2D;
+
     // Set canvas size
     const resizeCanvas = () => {
       canvas.width = window.innerWidth;
@@ -44,8 +48,8 @@ export function Particles({
       size: number;
 
       constructor() {
-        this.x = Math.random() * canvas.width;
-        this.y = Math.random() * canvas.height;
+        this.x = Math.random() * canvasEl.width;
+        this.y = Math.random() * canvasEl.height;
         this.vx = (Math.random() - 0.5) * speed;
         this.vy = (Math.random() - 0.5) * speed;
         this.size = Math.random() * size + 1;
@@ -55,16 +59,16 @@ export function Particles({
         this.x += this.vx;
         this.y += this.vy;
 
-        if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
-        if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+        if (this.x < 0 || this.x > canvasEl.width) this.vx *= -1;
+        if (this.y < 0 || this.y > canvasEl.height) this.vy *= -1;
       }
 
       draw() {
-        ctx.fillStyle = color;
-        ctx.globalAlpha = 0.6;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fill();
+        ctxEl.fillStyle = color;
+        ctxEl.globalAlpha = 0.6;
+        ctxEl.beginPath();
+        ctxEl.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctxEl.fill();
       }
     }
 
