@@ -142,18 +142,17 @@ export default function CanteenDashboard() {
     storageConditions: "",
   });
 
-  const [aiScan, setAiScan] = useState<
-    | {
-        spoilageRiskScore: number;
-        riskLevel: "Low" | "Medium" | "High" | "Critical";
-        reasons: string[];
-        recommendedAction: string;
-        safeByHours?: number;
-        suspiciousSigns?: string[];
-      }
-    | null
-  >(null);
+  const [aiScan, setAiScan] = useState<{
+    spoilageRiskScore: number;
+    riskLevel: "Low" | "Medium" | "High" | "Critical";
+    reasons: string[];
+    recommendedAction: string;
+    safeByHours?: number;
+    suspiciousSigns?: string[];
+  } | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
+  const [isSuggestingSafety, setIsSuggestingSafety] = useState(false);
 
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -175,9 +174,10 @@ export default function CanteenDashboard() {
       }
       setIsUploadingImage(true);
       const extFromType = selectedImage.type?.split("/")[1] || "jpg";
-      const unique = (typeof crypto !== "undefined" && (crypto as any).randomUUID)
-        ? (crypto as any).randomUUID()
-        : Math.random().toString(36).slice(2);
+      const unique =
+        typeof crypto !== "undefined" && (crypto as any).randomUUID
+          ? (crypto as any).randomUUID()
+          : Math.random().toString(36).slice(2);
       const fileName = `${unique}-${Date.now()}.${extFromType}`;
       const path = `listings/${fileName}`;
       const { error } = await supabase.storage
@@ -192,9 +192,16 @@ export default function CanteenDashboard() {
       const publicUrl = data?.publicUrl;
       if (!publicUrl) throw new Error("Failed to get public URL");
       setNewListing((prev) => ({ ...prev, imageUrl: publicUrl }));
-      toast({ title: "Image uploaded", description: "Linked to this listing." });
+      toast({
+        title: "Image uploaded",
+        description: "Linked to this listing.",
+      });
     } catch (e: any) {
-      toast({ title: "Upload failed", description: e?.message || "Please try again.", variant: "destructive" });
+      toast({
+        title: "Upload failed",
+        description: e?.message || "Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsUploadingImage(false);
     }
@@ -212,9 +219,10 @@ export default function CanteenDashboard() {
       }
       setEditIsUploadingImage(true);
       const extFromType = editSelectedImage.type?.split("/")[1] || "jpg";
-      const unique = (typeof crypto !== "undefined" && (crypto as any).randomUUID)
-        ? (crypto as any).randomUUID()
-        : Math.random().toString(36).slice(2);
+      const unique =
+        typeof crypto !== "undefined" && (crypto as any).randomUUID
+          ? (crypto as any).randomUUID()
+          : Math.random().toString(36).slice(2);
       const fileName = `${unique}-${Date.now()}.${extFromType}`;
       const path = `listings/${fileName}`;
       const { error } = await supabase.storage
@@ -229,9 +237,16 @@ export default function CanteenDashboard() {
       const publicUrl = data?.publicUrl;
       if (!publicUrl) throw new Error("Failed to get public URL");
       setEditImageUrl(publicUrl);
-      toast({ title: "Image uploaded", description: "Linked to this listing." });
+      toast({
+        title: "Image uploaded",
+        description: "Linked to this listing.",
+      });
     } catch (e: any) {
-      toast({ title: "Upload failed", description: e?.message || "Please try again.", variant: "destructive" });
+      toast({
+        title: "Upload failed",
+        description: e?.message || "Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setEditIsUploadingImage(false);
     }
@@ -302,6 +317,7 @@ export default function CanteenDashboard() {
   };
 
   const runAISafetySuggest = async () => {
+    setIsSuggestingSafety(true);
     try {
       const res = await fetch("/api/ai/suggest-safety", {
         method: "POST",
@@ -319,7 +335,9 @@ export default function CanteenDashboard() {
         ...prev,
         safetyRating: data.safetyRating ?? prev.safetyRating,
         storageConditions: data.storageConditions ?? prev.storageConditions,
-        allergens: Array.isArray(data.allergens) ? data.allergens : prev.allergens,
+        allergens: Array.isArray(data.allergens)
+          ? data.allergens
+          : prev.allergens,
       }));
       if (data.notes) {
         toast({ title: "Safety tips", description: data.notes });
@@ -327,7 +345,13 @@ export default function CanteenDashboard() {
         toast({ title: "Safety suggestions applied" });
       }
     } catch (e: any) {
-      toast({ title: "AI error", description: e?.message || "Failed to suggest", variant: "destructive" });
+      toast({
+        title: "AI error",
+        description: e?.message || "Failed to suggest",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSuggestingSafety(false);
     }
   };
 
@@ -512,6 +536,7 @@ export default function CanteenDashboard() {
   };
 
   const runAIDescription = async () => {
+    setIsGeneratingDescription(true);
     try {
       const res = await fetch("/api/ai/autofill-listing", {
         method: "POST",
@@ -532,9 +557,18 @@ export default function CanteenDashboard() {
         description: data.description || prev.description,
         foodName: data.suggestedTitle || prev.foodName,
       }));
-      toast({ title: "Description generated", description: "You can edit it before saving." });
+      toast({
+        title: "Description generated",
+        description: "You can edit it before saving.",
+      });
     } catch (e: any) {
-      toast({ title: "AI error", description: e?.message || "Failed to generate", variant: "destructive" });
+      toast({
+        title: "AI error",
+        description: e?.message || "Failed to generate",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingDescription(false);
     }
   };
 
@@ -1140,8 +1174,6 @@ export default function CanteenDashboard() {
                                   </TableRow>
                                 ))}
 
-                                
-
                                 {/* Expired listings */}
                                 {expiredListings.map((listing, index) => (
                                   <TableRow
@@ -1740,16 +1772,26 @@ export default function CanteenDashboard() {
                   <Input
                     type="file"
                     accept="image/*"
-                    onChange={(e) => setSelectedImage(e.target.files?.[0] || null)}
+                    onChange={(e) =>
+                      setSelectedImage(e.target.files?.[0] || null)
+                    }
                     className="bg-background/80 backdrop-blur-sm border-border/50"
                   />
-                  <Button onClick={handleImageUpload} variant="outline" disabled={isUploadingImage || !selectedImage}>
+                  <Button
+                    onClick={handleImageUpload}
+                    variant="outline"
+                    disabled={isUploadingImage || !selectedImage}
+                  >
                     {isUploadingImage ? "Uploading..." : "Upload Image"}
                   </Button>
                 </div>
                 {newListing.imageUrl && (
                   <div className="pt-1">
-                    <img src={newListing.imageUrl} alt="Preview" className="h-24 w-24 object-cover rounded-md border" />
+                    <img
+                      src={newListing.imageUrl}
+                      alt="Preview"
+                      className="h-24 w-24 object-cover rounded-md border"
+                    />
                   </div>
                 )}
               </div>
@@ -1773,8 +1815,20 @@ export default function CanteenDashboard() {
                 className="bg-background/80 backdrop-blur-sm border-border/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
               />
               <div>
-                <Button variant="outline" size="sm" onClick={runAIDescription}>
-                  AI: Autofill Description
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={runAIDescription}
+                  disabled={isGeneratingDescription}
+                >
+                  {isGeneratingDescription ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Generating...
+                    </>
+                  ) : (
+                    "AI: Autofill Description"
+                  )}
                 </Button>
               </div>
             </div>
@@ -1797,18 +1851,39 @@ export default function CanteenDashboard() {
               }}
             />
             <div className="flex items-start gap-3">
-              <Button onClick={runAISafetyScan} variant="outline" disabled={isScanning}>
+              <Button
+                onClick={runAISafetyScan}
+                variant="outline"
+                disabled={isScanning}
+              >
                 {isScanning ? "Scanning..." : "Run AI Safety Scan"}
               </Button>
-              <Button onClick={runAISafetySuggest} variant="outline">
-                AI: Suggest Safety Fields
+              <Button
+                onClick={runAISafetySuggest}
+                variant="outline"
+                disabled={isSuggestingSafety}
+              >
+                {isSuggestingSafety ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Suggesting...
+                  </>
+                ) : (
+                  "AI: Suggest Safety Fields"
+                )}
               </Button>
               {aiScan && (
                 <div className="text-sm space-y-1">
-                  <div className="font-medium">Risk: {aiScan.riskLevel} (Score {aiScan.spoilageRiskScore})</div>
-                  <div className="text-foreground/80">{aiScan.recommendedAction}</div>
+                  <div className="font-medium">
+                    Risk: {aiScan.riskLevel} (Score {aiScan.spoilageRiskScore})
+                  </div>
+                  <div className="text-foreground/80">
+                    {aiScan.recommendedAction}
+                  </div>
                   {aiScan.reasons && aiScan.reasons.length > 0 && (
-                    <div className="text-foreground/70">Reasons: {aiScan.reasons.slice(0, 3).join(", ")}</div>
+                    <div className="text-foreground/70">
+                      Reasons: {aiScan.reasons.slice(0, 3).join(", ")}
+                    </div>
                   )}
                 </div>
               )}
@@ -1889,16 +1964,26 @@ export default function CanteenDashboard() {
                     <Input
                       type="file"
                       accept="image/*"
-                      onChange={(e) => setEditSelectedImage(e.target.files?.[0] || null)}
+                      onChange={(e) =>
+                        setEditSelectedImage(e.target.files?.[0] || null)
+                      }
                       className="bg-background/80 backdrop-blur-sm border-border/50"
                     />
-                    <Button onClick={handleEditImageUpload} variant="outline" disabled={editIsUploadingImage || !editSelectedImage}>
+                    <Button
+                      onClick={handleEditImageUpload}
+                      variant="outline"
+                      disabled={editIsUploadingImage || !editSelectedImage}
+                    >
                       {editIsUploadingImage ? "Uploading..." : "Upload"}
                     </Button>
                   </div>
                   {editImageUrl && (
                     <div className="pt-1">
-                      <img src={editImageUrl} alt="Preview" className="h-24 w-24 object-cover rounded-md border" />
+                      <img
+                        src={editImageUrl}
+                        alt="Preview"
+                        className="h-24 w-24 object-cover rounded-md border"
+                      />
                     </div>
                   )}
                 </div>

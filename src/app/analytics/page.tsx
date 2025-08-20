@@ -20,9 +20,9 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { AuthGuard } from "@/components/auth-guard";
 import { supabase } from "@/lib/supabase";
 import { getAllEvents, getEventSummary } from "@/lib/database";
+import { DemandPredictionComponent } from "@/components/demand-prediction";
 import {
   BarChart,
   Bar,
@@ -35,6 +35,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import { Trophy, Award, Medal, Star } from "lucide-react";
 
 interface EventAnalytics {
   id: string;
@@ -66,6 +67,19 @@ interface OverallStats {
   topPerformingEvents: EventAnalytics[];
   totalCarbonSavedKgCO2e: number;
   totalWaterSavedLiters: number;
+}
+
+interface LeaderboardEntry {
+  organizerId: string;
+  organizerName: string;
+  totalSavedGrams: number;
+  totalListings: number;
+  pickedUpListings: number;
+  eventsCount: number;
+  efficiencyAvg: number;
+  points: number;
+  badges: string[];
+  carbonSavedKgCO2e?: number;
 }
 
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
@@ -146,11 +160,16 @@ function getFootprintFactorsForName(foodName: string): {
   else if (/(egg|omelette)/.test(name)) set(4.5, 3300);
   else if (/(rice|biryani|pulao)/.test(name)) set(4, 2500);
   else if (/(wheat|roti|bread|pasta|noodle|chapati)/.test(name)) set(1.3, 1800);
-  else if (/(bean|lentil|dal|legume|chickpea|chole|rajma)/.test(name)) set(0.9, 4000);
+  else if (/(bean|lentil|dal|legume|chickpea|chole|rajma)/.test(name))
+    set(0.9, 4000);
   else if (/(potato|aloo)/.test(name)) set(0.3, 287);
-  else if (/(vegetable|veg|salad|greens|sabzi|bhaji|spinach|carrot|cabbage)/.test(name)) set(0.5, 300);
+  else if (
+    /(vegetable|veg|salad|greens|sabzi|bhaji|spinach|carrot|cabbage)/.test(name)
+  )
+    set(0.5, 300);
   else if (/(fruit|banana|apple|orange|mango|grape)/.test(name)) set(0.8, 800);
-  else if (/(snack|samosa|pakora|chips|pastry|dessert|sweet)/.test(name)) set(2.0, 1000);
+  else if (/(snack|samosa|pakora|chips|pastry|dessert|sweet)/.test(name))
+    set(2.0, 1000);
 
   return { co2ePerKg, waterPerKg };
 }
@@ -161,7 +180,12 @@ export default function AnalyticsPage() {
   const [events, setEvents] = useState<EventAnalytics[]>([]);
   const [overallStats, setOverallStats] = useState<OverallStats | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<string>("all");
-  const [timeFilter, setTimeFilter] = useState<string>("30");
+  const [timeFilter, setTimeFilter] = useState<string>("all");
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [leaderboardSort, setLeaderboardSort] = useState<
+    "points" | "saved" | "efficiency" | "events"
+  >("points");
+  const [leaderboardLimit, setLeaderboardLimit] = useState<number>(10);
 
   useEffect(() => {
     loadAnalytics();
@@ -181,7 +205,24 @@ export default function AnalyticsPage() {
       let totalCarbonSavedKgCO2e = 0;
       let totalWaterSavedLiters = 0;
 
-      for (const event of allEvents) {
+      const organizerIdToEntry: Map<
+        string,
+        LeaderboardEntry & { efficiencySum: number }
+      > = new Map();
+
+      // Apply time filter to events
+      let filteredEventsList = allEvents;
+      if (timeFilter !== "all") {
+        const days = parseInt(timeFilter || "30", 10);
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - (Number.isFinite(days) ? days : 30));
+        filteredEventsList = allEvents.filter((e: any) => {
+          const d = new Date(e.date);
+          return !Number.isNaN(d.getTime()) && d >= cutoff;
+        });
+      }
+
+      for (const event of filteredEventsList) {
         try {
           const summary = await getEventSummary(event.id);
 
@@ -198,12 +239,18 @@ export default function AnalyticsPage() {
               .eq("event_id", event.id);
 
             if (listings) {
-              for (const l of listings as Array<{ quantity: string; status: string; food_name: string }>) {
+              for (const l of listings as Array<{
+                quantity: string;
+                status: string;
+                food_name: string;
+              }>) {
                 const grams = parseQuantity(l.quantity || "0");
                 rawQuantities.push(l.quantity || "0");
                 if (grams <= 0) continue;
                 const kg = grams / 1000;
-                const { co2ePerKg, waterPerKg } = getFootprintFactorsForName(l.food_name || "");
+                const { co2ePerKg, waterPerKg } = getFootprintFactorsForName(
+                  l.food_name || ""
+                );
                 const itemCarbon = kg * co2ePerKg;
                 const itemWater = kg * waterPerKg;
                 if (l.status === "picked_up") {
@@ -265,6 +312,34 @@ export default function AnalyticsPage() {
           totalMealsServed += summary.mealsServedEstimate;
           totalCarbonSavedKgCO2e += carbonSavedKgCO2e;
           totalWaterSavedLiters += waterSavedLiters;
+
+          // Aggregate by organizer for leaderboard
+          const organizerId = (event as any).organizer_id || "unknown";
+          const organizerName =
+            (event as any).organizer_name || "Unknown Organizer";
+          const existing = organizerIdToEntry.get(organizerId);
+          const base: LeaderboardEntry & { efficiencySum: number } =
+            existing || {
+              organizerId,
+              organizerName,
+              totalSavedGrams: 0,
+              totalListings: 0,
+              pickedUpListings: 0,
+              eventsCount: 0,
+              efficiencyAvg: 0,
+              points: 0,
+              badges: [],
+              efficiencySum: 0,
+              carbonSavedKgCO2e: 0,
+            };
+          base.totalSavedGrams += parsedPickedUp;
+          base.totalListings += summary.totals.totalListings;
+          base.pickedUpListings += summary.totals.pickedUp;
+          base.eventsCount += 1;
+          base.efficiencySum += analytics.efficiency;
+          base.carbonSavedKgCO2e =
+            (base.carbonSavedKgCO2e || 0) + carbonSavedKgCO2e;
+          organizerIdToEntry.set(organizerId, base);
         } catch (error) {
           console.error(`Error getting summary for event ${event.id}:`, error);
         }
@@ -275,7 +350,7 @@ export default function AnalyticsPage() {
 
       // Calculate overall stats
       const overall: OverallStats = {
-        totalEvents: allEvents.length,
+        totalEvents: filteredEventsList.length,
         totalListings,
         totalFoodSaved,
         totalMealsServed,
@@ -293,6 +368,42 @@ export default function AnalyticsPage() {
 
       setEvents(eventAnalytics);
       setOverallStats(overall);
+
+      // Build leaderboard
+      const entries: LeaderboardEntry[] = Array.from(
+        organizerIdToEntry.values()
+      )
+        .map((e) => {
+          const efficiencyAvg =
+            e.eventsCount > 0 ? Math.round(e.efficiencySum / e.eventsCount) : 0;
+          const totalSavedKg = e.totalSavedGrams / 1000;
+          const points = Math.round(
+            totalSavedKg + efficiencyAvg * 0.5 + e.pickedUpListings * 0.5
+          );
+          const badges: string[] = [];
+          if (totalSavedKg >= 50) badges.push("Waste Warrior");
+          if (efficiencyAvg >= 80) badges.push("Efficiency Star");
+          if (e.eventsCount >= 3) badges.push("Consistency Champ");
+          if (
+            (e as any).carbonSavedKgCO2e &&
+            (e as any).carbonSavedKgCO2e >= 100
+          )
+            badges.push("Green Guardian");
+          return {
+            organizerId: e.organizerId,
+            organizerName: e.organizerName,
+            totalSavedGrams: e.totalSavedGrams,
+            totalListings: e.totalListings,
+            pickedUpListings: e.pickedUpListings,
+            eventsCount: e.eventsCount,
+            efficiencyAvg,
+            points,
+            badges,
+            carbonSavedKgCO2e: (e as any).carbonSavedKgCO2e,
+          };
+        })
+        .sort((a, b) => b.points - a.points);
+      setLeaderboard(entries);
     } catch (error) {
       console.error("Error loading analytics:", error);
       toast({
@@ -349,8 +460,8 @@ export default function AnalyticsPage() {
   const getEfficiencyData = () => {
     const filtered = getFilteredEvents();
     return filtered.map((event) => ({
-      name: event.name,
-      efficiency: event.efficiency,
+      name: event.name || "Unnamed Event",
+      efficiency: Number.isFinite(event.efficiency) ? event.efficiency : 0,
     }));
   };
 
@@ -371,6 +482,12 @@ export default function AnalyticsPage() {
     ];
   };
 
+  // Safe formatting helpers to avoid NaN-related runtime errors
+  const safeFixed = (n: number, digits: number) =>
+    Number.isFinite(n) ? n.toFixed(digits) : (0).toFixed(digits);
+  const safeDiv = (n: number, d: number) =>
+    d !== 0 && Number.isFinite(n) && Number.isFinite(d) ? n / d : 0;
+
   if (loading) {
     return (
       <div className="container mx-auto p-4">
@@ -390,484 +507,670 @@ export default function AnalyticsPage() {
   const filteredStats = getFilteredStats();
 
   return (
-    <AuthGuard>
-      <div className="container mx-auto p-4 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Event Analytics Dashboard</h1>
-            <p className="text-muted-foreground">
-              Track the impact of your events and food redistribution efforts
-            </p>
+    <div className="container mx-auto p-4 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Event Analytics Dashboard</h1>
+          <p className="text-muted-foreground">
+            Track the impact of your events and food redistribution efforts
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="timeFilter">Time Period:</Label>
+            <Select value={timeFilter} onValueChange={setTimeFilter}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7">Last 7 days</SelectItem>
+                <SelectItem value="30">Last 30 days</SelectItem>
+                <SelectItem value="90">Last 90 days</SelectItem>
+                <SelectItem value="all">All time</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <div className="flex gap-2">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="timeFilter">Time Period:</Label>
-              <Select value={timeFilter} onValueChange={setTimeFilter}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="7">Last 7 days</SelectItem>
-                  <SelectItem value="30">Last 30 days</SelectItem>
-                  <SelectItem value="90">Last 90 days</SelectItem>
-                  <SelectItem value="all">All time</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-2">
-              <Label htmlFor="eventFilter">Event:</Label>
-              <Select value={selectedEvent} onValueChange={setSelectedEvent}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="All Events" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Events</SelectItem>
-                  {events.map((event) => (
-                    <SelectItem key={event.id} value={event.id}>
-                      {event.name} ({event.date})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="eventFilter">Event:</Label>
+            <Select value={selectedEvent} onValueChange={setSelectedEvent}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="All Events" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Events</SelectItem>
+                {events.map((event) => (
+                  <SelectItem key={event.id} value={event.id}>
+                    {event.name} ({event.date})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
+      </div>
 
-        {/* Overall Stats */}
-        {overallStats && (
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total Events
-                </CardTitle>
-                <Badge variant="secondary">{overallStats.totalEvents}</Badge>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {overallStats.totalEvents}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Events managed through the system
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total Food Saved
-                </CardTitle>
-                <Badge variant="secondary">
-                  {(overallStats.totalFoodSaved / 1000).toFixed(1)} kg
-                </Badge>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {(overallStats.totalFoodSaved / 1000).toFixed(1)}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Kilograms of food posted as surplus (parsed from quantity
-                  strings)
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Meals Served
-                </CardTitle>
-                <Badge variant="secondary">
-                  {overallStats.totalMealsServed}
-                </Badge>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {overallStats.totalMealsServed}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Estimated meals served through redistribution
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Avg. Efficiency
-                </CardTitle>
-                <Badge variant="secondary">
-                  {overallStats.averageEfficiency}%
-                </Badge>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {overallStats.averageEfficiency}%
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Average food pickup rate across events
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total Carbon Saved
-                </CardTitle>
-                <Badge variant="secondary">
-                  {overallStats.totalCarbonSavedKgCO2e.toFixed(1)} kg CO₂e
-                </Badge>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {(overallStats.totalCarbonSavedKgCO2e / 1000).toFixed(2)} t
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Estimated CO₂e avoided via redistribution
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total Water Saved
-                </CardTitle>
-                <Badge variant="secondary">
-                  {(overallStats.totalWaterSavedLiters / 1000).toFixed(1)} kL
-                </Badge>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {(overallStats.totalWaterSavedLiters / 1000000).toFixed(2)} ML
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Estimated freshwater use avoided
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Filtered Stats */}
-        {filteredStats && (
+      {/* Overall Stats */}
+      {overallStats && (
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Filtered Statistics</CardTitle>
-              <CardDescription>
-                {selectedEvent === "all"
-                  ? "All Events"
-                  : `Event: ${
-                      events.find((e) => e.id === selectedEvent)?.name
-                    }`}
-              </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Total Events
+              </CardTitle>
+              <Badge variant="secondary">{overallStats.totalEvents}</Badge>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-center">
-                <div>
-                  <div className="text-2xl font-bold">
-                    {filteredStats.totalEvents}
-                  </div>
-                  <div className="text-sm text-muted-foreground">Events</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold">
-                    {filteredStats.totalListings}
-                  </div>
-                  <div className="text-sm text-muted-foreground">Listings</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold">
-                    {filteredStats.totalFoodSaved}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Food Saved (kg)
-                  </div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold">
-                    {filteredStats.averageEfficiency}%
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Efficiency
-                  </div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold">
-                    {filteredStats.totalCarbonSavedKgCO2e.toFixed(1)}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Carbon Saved (kg CO₂e)
-                  </div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold">
-                    {(filteredStats.totalWaterSavedLiters / 1000).toFixed(1)}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Water Saved (kL)
-                  </div>
-                </div>
+              <div className="text-2xl font-bold">
+                {overallStats.totalEvents}
               </div>
+              <p className="text-xs text-muted-foreground">
+                Events managed through the system
+              </p>
             </CardContent>
           </Card>
-        )}
-
-        {/* Charts */}
-        <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="efficiency">Efficiency Analysis</TabsTrigger>
-            <TabsTrigger value="distribution">Status Distribution</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="overview" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Food Distribution by Event</CardTitle>
-                <CardDescription>
-                  Shows how much food was picked up vs expired for each event
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={400}>
-                  <BarChart data={getChartData()}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="Picked Up" fill="#00C49F" />
-                    <Bar dataKey="Expired" fill="#FF8042" />
-                    <Bar dataKey="Available" fill="#0088FE" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="efficiency" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Event Efficiency Ranking</CardTitle>
-                <CardDescription>
-                  Events ranked by their food pickup efficiency percentage
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={400}>
-                  <BarChart data={getEfficiencyData()} layout="horizontal">
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" domain={[0, 100]} />
-                    <YAxis dataKey="name" type="category" width={150} />
-                    <Tooltip formatter={(value) => `${value}%`} />
-                    <Bar dataKey="efficiency" fill="#00C49F" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="distribution" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Overall Status Distribution</CardTitle>
-                <CardDescription>
-                  Pie chart showing the breakdown of all food listings by status
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={400}>
-                  <PieChart>
-                    <Pie
-                      data={getStatusDistribution()}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) =>
-                        `${name} ${(percent * 100).toFixed(0)}%`
-                      }
-                      outerRadius={150}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {getStatusDistribution().map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-
-        {/* Top Performing Events */}
-        {overallStats && overallStats.topPerformingEvents.length > 0 && (
           <Card>
-            <CardHeader>
-              <CardTitle>Top Performing Events</CardTitle>
-              <CardDescription>
-                Events with the highest food pickup efficiency
-              </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Total Food Saved
+              </CardTitle>
+              <Badge variant="secondary">
+                {safeFixed(safeDiv(overallStats.totalFoodSaved, 1000), 1)} kg
+              </Badge>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {overallStats.topPerformingEvents.map((event, index) => (
-                  <div
-                    key={event.id}
-                    className="flex items-center justify-between p-4 border rounded-lg"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center font-bold">
-                        {index + 1}
-                      </div>
-                      <div>
-                        <div className="font-semibold">{event.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {event.date}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-green-600">
-                        {event.efficiency}%
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {event.pickedUpQuantity} kg picked up
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              <div className="text-2xl font-bold">
+                {safeFixed(safeDiv(overallStats.totalFoodSaved, 1000), 1)}
               </div>
+              <p className="text-xs text-muted-foreground">
+                Kilograms of food posted as surplus (parsed from quantity
+                strings)
+              </p>
             </CardContent>
           </Card>
-        )}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Meals Served
+              </CardTitle>
+              <Badge variant="secondary">{overallStats.totalMealsServed}</Badge>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {overallStats.totalMealsServed}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Estimated meals served through redistribution
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Avg. Efficiency
+              </CardTitle>
+              <Badge variant="secondary">
+                {overallStats.averageEfficiency}%
+              </Badge>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {overallStats.averageEfficiency}%
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Average food pickup rate across events
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Total Carbon Saved
+              </CardTitle>
+              <Badge variant="secondary">
+                {safeFixed(overallStats.totalCarbonSavedKgCO2e, 1)} kg CO₂e
+              </Badge>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {safeFixed(
+                  safeDiv(overallStats.totalCarbonSavedKgCO2e, 1000),
+                  2
+                )}{" "}
+                t
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Estimated CO₂e avoided via redistribution
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Total Water Saved
+              </CardTitle>
+              <Badge variant="secondary">
+                {safeFixed(
+                  safeDiv(overallStats.totalWaterSavedLiters, 1000),
+                  1
+                )}{" "}
+                kL
+              </Badge>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {safeFixed(
+                  safeDiv(overallStats.totalWaterSavedLiters, 1000000),
+                  2
+                )}{" "}
+                ML
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Estimated freshwater use avoided
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
-        {/* Event Details Table */}
+      {/* Filtered Stats */}
+      {filteredStats && (
         <Card>
           <CardHeader>
-            <CardTitle>Event Details</CardTitle>
+            <CardTitle>Filtered Statistics</CardTitle>
             <CardDescription>
-              Comprehensive breakdown of all events and their performance
-              <br />
-              <span className="text-xs text-muted-foreground">
-                Quantities are parsed from strings (e.g., "50 plates" → 10kg
-                estimated)
-              </span>
+              {selectedEvent === "all"
+                ? "All Events"
+                : `Event: ${events.find((e) => e.id === selectedEvent)?.name}`}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-2 text-foreground font-medium">
-                      Event
-                    </th>
-                    <th className="text-left p-2 text-foreground font-medium">
-                      Date
-                    </th>
-                    <th className="text-left p-2 text-foreground font-medium">
-                      Status
-                    </th>
-                    <th className="text-left p-2 text-foreground font-medium">
-                      Listings
-                    </th>
-                    <th className="text-left p-2 text-foreground font-medium">
-                      Food Saved (g)
-                    </th>
-                    <th className="text-left p-2 text-foreground font-medium">
-                      Picked Up (g)
-                    </th>
-                    <th className="text-left p-2 text-foreground font-medium">
-                      Efficiency
-                    </th>
-                    <th className="text-left p-2 text-foreground font-medium">
-                      Carbon Saved (kg CO₂e)
-                    </th>
-                    <th className="text-left p-2 text-foreground font-medium">
-                      Water Saved (kL)
-                    </th>
-                    <th className="text-left p-2 text-foreground font-medium">
-                      Raw Data
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {events.map((event) => (
-                    <tr
-                      key={event.id}
-                      className="border-b hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                    >
-                      <td className="p-2 font-medium text-foreground">
-                        {event.name}
-                      </td>
-                      <td className="p-2 text-foreground">{event.date}</td>
-                      <td className="p-2">
-                        <Badge
-                          variant={
-                            event.status === "completed"
-                              ? "default"
-                              : event.status === "ongoing"
-                              ? "secondary"
-                              : "outline"
-                          }
-                        >
-                          {event.status}
-                        </Badge>
-                      </td>
-                      <td className="p-2 text-foreground">
-                        {event.totalListings}
-                      </td>
-                      <td className="p-2 text-foreground">
-                        {event.totalQuantity > 0
-                          ? `${(event.totalQuantity / 1000).toFixed(1)} kg`
-                          : "0 kg"}
-                      </td>
-                      <td className="p-2 text-foreground">
-                        {event.pickedUpQuantity > 0
-                          ? `${(event.pickedUpQuantity / 1000).toFixed(1)} kg`
-                          : "0 kg"}
-                      </td>
-                      <td className="p-2">
-                        <span
-                          className={`font-semibold ${
-                            event.efficiency >= 80
-                              ? "text-green-600 dark:text-green-400"
-                              : event.efficiency >= 60
-                              ? "text-yellow-600 dark:text-yellow-400"
-                              : "text-red-600 dark:text-red-400"
-                          }`}
-                        >
-                          {event.efficiency}%
-                        </span>
-                      </td>
-                      <td className="p-2 text-foreground">
-                        {event.carbonSavedKgCO2e > 0
-                          ? event.carbonSavedKgCO2e.toFixed(1)
-                          : "0.0"}
-                      </td>
-                      <td className="p-2 text-foreground">
-                        {event.waterSavedLiters > 0
-                          ? (event.waterSavedLiters / 1000).toFixed(1)
-                          : "0.0"}
-                      </td>
-                      <td className="p-2 text-xs text-muted-foreground">
-                        <div
-                          className="max-w-32 truncate"
-                          title={event.rawQuantities.join(", ")}
-                        >
-                          {event.rawQuantities.length > 0
-                            ? event.rawQuantities.join(", ")
-                            : "No data"}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-center">
+              <div>
+                <div className="text-2xl font-bold">
+                  {filteredStats.totalEvents}
+                </div>
+                <div className="text-sm text-muted-foreground">Events</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold">
+                  {filteredStats.totalListings}
+                </div>
+                <div className="text-sm text-muted-foreground">Listings</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold">
+                  {filteredStats.totalFoodSaved}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Food Saved (kg)
+                </div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold">
+                  {filteredStats.averageEfficiency}%
+                </div>
+                <div className="text-sm text-muted-foreground">Efficiency</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold">
+                  {safeFixed(filteredStats.totalCarbonSavedKgCO2e, 1)}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Carbon Saved (kg CO₂e)
+                </div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold">
+                  {safeFixed(
+                    safeDiv(filteredStats.totalWaterSavedLiters, 1000),
+                    1
+                  )}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Water Saved (kL)
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
-      </div>
-    </AuthGuard>
+      )}
+
+      {/* Charts */}
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="efficiency">Efficiency Analysis</TabsTrigger>
+          <TabsTrigger value="distribution">Status Distribution</TabsTrigger>
+          <TabsTrigger value="prediction">AI Demand Prediction</TabsTrigger>
+          <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Food Distribution by Event</CardTitle>
+              <CardDescription>
+                Shows how much food was picked up vs expired for each event
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={400}>
+                <BarChart data={getChartData()}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="Picked Up" fill="#00C49F" />
+                  <Bar dataKey="Expired" fill="#FF8042" />
+                  <Bar dataKey="Available" fill="#0088FE" />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="efficiency" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Event Efficiency Ranking</CardTitle>
+              <CardDescription>
+                Events ranked by their food pickup efficiency percentage
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={400}>
+                <BarChart data={getEfficiencyData()} layout="horizontal">
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" domain={[0, 100]} />
+                  <YAxis dataKey="name" type="category" width={150} />
+                  <Tooltip formatter={(value) => `${value}%`} />
+                  <Bar dataKey="efficiency" fill="#00C49F" />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="distribution" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Overall Status Distribution</CardTitle>
+              <CardDescription>
+                Pie chart showing the breakdown of all food listings by status
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={400}>
+                <PieChart>
+                  <Pie
+                    data={getStatusDistribution()}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent, value }) => {
+                      const p = Number.isFinite(percent) ? percent : 0;
+                      return value && value > 0
+                        ? `${name} ${(p * 100).toFixed(0)}%`
+                        : name;
+                    }}
+                    outerRadius={150}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {getStatusDistribution().map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="prediction" className="space-y-4">
+          <DemandPredictionComponent />
+        </TabsContent>
+
+        <TabsContent value="leaderboard" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Trophy className="h-5 w-5" /> Impact Leaderboard (Canteens)
+              </CardTitle>
+              <CardDescription>
+                Points based on food saved (kg), efficiency, and pickups. Badges
+                awarded for outstanding performance.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {/* Leaderboard controls */}
+              <div className="mb-4 flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="lbSort">Sort by:</Label>
+                  <Select
+                    value={leaderboardSort}
+                    onValueChange={(v) =>
+                      setLeaderboardSort(
+                        v as "points" | "saved" | "efficiency" | "events"
+                      )
+                    }
+                  >
+                    <SelectTrigger className="w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="points">Points</SelectItem>
+                      <SelectItem value="saved">Food Saved (kg)</SelectItem>
+                      <SelectItem value="efficiency">
+                        Avg. Efficiency
+                      </SelectItem>
+                      <SelectItem value="events">Events</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label>Show:</Label>
+                  <Button
+                    size="sm"
+                    variant={leaderboardLimit === 10 ? "default" : "outline"}
+                    onClick={() => setLeaderboardLimit(10)}
+                  >
+                    Top 10
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={leaderboardLimit === 25 ? "default" : "outline"}
+                    onClick={() => setLeaderboardLimit(25)}
+                  >
+                    Top 25
+                  </Button>
+                </div>
+              </div>
+              {leaderboard.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No leaderboard data yet.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {(() => {
+                    const sorted = [...leaderboard].sort((a, b) => {
+                      if (leaderboardSort === "saved") {
+                        return b.totalSavedGrams - a.totalSavedGrams;
+                      } else if (leaderboardSort === "efficiency") {
+                        return b.efficiencyAvg - a.efficiencyAvg;
+                      } else if (leaderboardSort === "events") {
+                        return b.eventsCount - a.eventsCount;
+                      }
+                      return b.points - a.points;
+                    });
+                    const podium = sorted.slice(0, 3);
+                    const list = sorted.slice(0, leaderboardLimit);
+                    return (
+                      <>
+                        {podium.length === 3 && (
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            {podium.map((entry, i) => (
+                              <div
+                                key={`podium-${entry.organizerId}`}
+                                className="p-4 border rounded-lg text-center"
+                              >
+                                <div className="flex items-center justify-center gap-2 mb-1">
+                                  {i === 0 && (
+                                    <Trophy className="h-5 w-5 text-yellow-500" />
+                                  )}
+                                  {i === 1 && (
+                                    <Medal className="h-5 w-5 text-gray-400" />
+                                  )}
+                                  {i === 2 && (
+                                    <Medal className="h-5 w-5 text-amber-700" />
+                                  )}
+                                  <span className="font-semibold">
+                                    {entry.organizerName}
+                                  </span>
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {Math.round(entry.totalSavedGrams / 1000)} kg
+                                  • {entry.efficiencyAvg}% eff.
+                                </div>
+                                <div className="mt-1 text-primary font-bold">
+                                  {entry.points} pts
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {list.map((entry, idx) => (
+                          <div
+                            key={entry.organizerId}
+                            className="flex items-center justify-between p-4 border rounded-lg"
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className="w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center font-bold">
+                                {idx + 1}
+                              </div>
+                              <div>
+                                <div className="font-semibold">
+                                  {entry.organizerName}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {Math.round(entry.totalSavedGrams / 1000)} kg
+                                  saved • Avg eff. {entry.efficiencyAvg}% •{" "}
+                                  {entry.eventsCount} events
+                                </div>
+                                {entry.badges.length > 0 && (
+                                  <div className="mt-1 flex flex-wrap gap-2">
+                                    {entry.badges.map((b) => (
+                                      <Badge key={b} variant="secondary">
+                                        {b}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-2xl font-bold text-primary">
+                                {entry.points}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                points
+                              </div>
+                              {typeof (entry as any).carbonSavedKgCO2e ===
+                                "number" && (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  {(
+                                    (entry as any).carbonSavedKgCO2e || 0
+                                  ).toFixed(1)}{" "}
+                                  kg CO₂e saved
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
+              <div className="mt-4 text-xs text-muted-foreground">
+                NGO leaderboard requires attributing pickups to NGO accounts. We
+                can add this by recording the NGO on pickup and aggregating
+                similarly.
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Top Performing Events */}
+      {overallStats && overallStats.topPerformingEvents.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Top Performing Events</CardTitle>
+            <CardDescription>
+              Events with the highest food pickup efficiency
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {overallStats.topPerformingEvents.map((event, index) => (
+                <div
+                  key={event.id}
+                  className="flex items-center justify-between p-4 border rounded-lg"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center font-bold">
+                      {index + 1}
+                    </div>
+                    <div>
+                      <div className="font-semibold">{event.name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {event.date}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-green-600">
+                      {event.efficiency}%
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {event.pickedUpQuantity} kg picked up
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Event Details Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Event Details</CardTitle>
+          <CardDescription>
+            Comprehensive breakdown of all events and their performance
+            <br />
+            <span className="text-xs text-muted-foreground">
+              Quantities are parsed from strings (e.g., "50 plates" → 10kg
+              estimated)
+            </span>
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left p-2 text-foreground font-medium">
+                    Event
+                  </th>
+                  <th className="text-left p-2 text-foreground font-medium">
+                    Date
+                  </th>
+                  <th className="text-left p-2 text-foreground font-medium">
+                    Status
+                  </th>
+                  <th className="text-left p-2 text-foreground font-medium">
+                    Listings
+                  </th>
+                  <th className="text-left p-2 text-foreground font-medium">
+                    Food Saved (g)
+                  </th>
+                  <th className="text-left p-2 text-foreground font-medium">
+                    Picked Up (g)
+                  </th>
+                  <th className="text-left p-2 text-foreground font-medium">
+                    Efficiency
+                  </th>
+                  <th className="text-left p-2 text-foreground font-medium">
+                    Carbon Saved (kg CO₂e)
+                  </th>
+                  <th className="text-left p-2 text-foreground font-medium">
+                    Water Saved (kL)
+                  </th>
+                  <th className="text-left p-2 text-foreground font-medium">
+                    Raw Data
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {events.map((event) => (
+                  <tr
+                    key={event.id}
+                    className="border-b hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  >
+                    <td className="p-2 font-medium text-foreground">
+                      {event.name}
+                    </td>
+                    <td className="p-2 text-foreground">{event.date}</td>
+                    <td className="p-2">
+                      <Badge
+                        variant={
+                          event.status === "completed"
+                            ? "default"
+                            : event.status === "ongoing"
+                            ? "secondary"
+                            : "outline"
+                        }
+                      >
+                        {event.status}
+                      </Badge>
+                    </td>
+                    <td className="p-2 text-foreground">
+                      {event.totalListings}
+                    </td>
+                    <td className="p-2 text-foreground">
+                      {event.totalQuantity > 0
+                        ? `${(event.totalQuantity / 1000).toFixed(1)} kg`
+                        : "0 kg"}
+                    </td>
+                    <td className="p-2 text-foreground">
+                      {event.pickedUpQuantity > 0
+                        ? `${(event.pickedUpQuantity / 1000).toFixed(1)} kg`
+                        : "0 kg"}
+                    </td>
+                    <td className="p-2">
+                      <span
+                        className={`font-semibold ${
+                          event.efficiency >= 80
+                            ? "text-green-600 dark:text-green-400"
+                            : event.efficiency >= 60
+                            ? "text-yellow-600 dark:text-yellow-400"
+                            : "text-red-600 dark:text-red-400"
+                        }`}
+                      >
+                        {event.efficiency}%
+                      </span>
+                    </td>
+                    <td className="p-2 text-foreground">
+                      {event.carbonSavedKgCO2e > 0
+                        ? safeFixed(event.carbonSavedKgCO2e, 1)
+                        : "0.0"}
+                    </td>
+                    <td className="p-2 text-foreground">
+                      {event.waterSavedLiters > 0
+                        ? (event.waterSavedLiters / 1000).toFixed(1)
+                        : "0.0"}
+                    </td>
+                    <td className="p-2 text-xs text-muted-foreground">
+                      <div
+                        className="max-w-32 truncate"
+                        title={event.rawQuantities.join(", ")}
+                      >
+                        {event.rawQuantities.length > 0
+                          ? event.rawQuantities.join(", ")
+                          : "No data"}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

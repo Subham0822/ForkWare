@@ -79,7 +79,7 @@ const convertDBToListing = (dbListing: DBFoodListing): FoodListing => {
     image: dbListing.image_url || "https://placehold.co/600x400.png",
     createdAt: dbListing.created_at,
     hint: dbListing.food_name.toLowerCase(),
-    eventId: dbListing.event_id,
+    eventId: dbListing.events ? dbListing.event_id : undefined,
     // Food Safety Fields
     temperature: dbListing.temperature,
     allergens: dbListing.allergens,
@@ -101,9 +101,12 @@ const getCurrentUserId = async (): Promise<string> => {
     const { getSession } = await import("@/app/actions/auth-supabase");
     const customSession = await getSession();
     // Fix: Ensure customSession.user is typed as an object with an optional id property
-    const userId = (customSession?.user && typeof customSession.user === "object" && "id" in customSession.user)
-      ? (customSession.user as { id?: string }).id
-      : undefined;
+    const userId =
+      customSession?.user &&
+      typeof customSession.user === "object" &&
+      "id" in customSession.user
+        ? (customSession.user as { id?: string }).id
+        : undefined;
     if (userId) {
       return userId;
     }
