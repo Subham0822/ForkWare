@@ -267,6 +267,19 @@ export function FoodListingsProvider({ children }: { children: ReactNode }) {
             : "expired";
       }
       if (updates.imageUrl) dbUpdates.image_url = updates.imageUrl;
+      // Map safety fields to DB
+      if (typeof updates.safetyRating !== "undefined")
+        dbUpdates.safety_rating = updates.safetyRating;
+      if (typeof updates.temperature !== "undefined")
+        dbUpdates.temperature = updates.temperature;
+      if (typeof updates.allergens !== "undefined")
+        dbUpdates.allergens = updates.allergens;
+      if (typeof updates.preparationMethod !== "undefined")
+        dbUpdates.preparation_method = updates.preparationMethod;
+      if (typeof updates.storageConditions !== "undefined")
+        dbUpdates.storage_conditions = updates.storageConditions;
+      if (typeof updates.lastInspection !== "undefined")
+        dbUpdates.last_inspection = updates.lastInspection;
 
       await updateFoodListingDB(id, dbUpdates);
 

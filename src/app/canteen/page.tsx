@@ -46,6 +46,7 @@ import { TypeAnimation } from "@/components/ui/type-animation";
 import { Particles } from "@/components/ui/particles";
 import { AnimatedList } from "@/components/ui/animated-list";
 import { ScrollStack } from "@/components/ui/scroll-stack";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Plus,
   Clock,
@@ -150,6 +151,9 @@ export default function CanteenDashboard() {
     safeByHours?: number;
     suspiciousSigns?: string[];
   } | null>(null);
+  type AiScan = NonNullable<typeof aiScan>;
+  const [aiScanByListing, setAiScanByListing] = useState<Record<string, AiScan>>({});
+  const [isScanningById, setIsScanningById] = useState<Record<string, boolean>>({});
   const [isScanning, setIsScanning] = useState(false);
   const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
   const [isSuggestingSafety, setIsSuggestingSafety] = useState(false);
@@ -268,6 +272,63 @@ export default function CanteenDashboard() {
     return 1;
   };
 
+  const getRiskBadgeClasses = (risk: AiScan["riskLevel"]) => {
+    switch (risk) {
+      case "Low":
+        return "bg-green-100 text-green-800 border border-green-200";
+      case "Medium":
+        return "bg-yellow-100 text-yellow-800 border border-yellow-200";
+      case "High":
+        return "bg-orange-100 text-orange-800 border border-orange-200";
+      case "Critical":
+      default:
+        return "bg-red-100 text-red-800 border border-red-200";
+    }
+  };
+
+  const runAISafetyScanForListing = async (listing: FoodListing) => {
+    if (!listing.imageUrl) {
+      toast({
+        title: "Image required",
+        description: "Add an image to this listing to run AI safety scan.",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      setIsScanningById((prev) => ({ ...prev, [listing.id]: true }));
+      const res = await fetch("/api/ai/safety-scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageUrl: listing.imageUrl,
+          temperature: listing.temperature,
+          preparationMethod: listing.preparationMethod,
+          quantity: listing.quantity,
+          expiryDate: listing.expires,
+          foodName: listing.name,
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Scan failed");
+      const data: AiScan = await res.json();
+      setAiScanByListing((prev) => ({ ...prev, [listing.id]: data }));
+      // Persist mapped rating for quick filtering/overview
+      await updateFoodListing(listing.id, { safetyRating: mapRiskToRating(data.riskLevel) });
+      toast({
+        title: "AI Safety Scan complete",
+        description: `Risk: ${data.riskLevel} • Score: ${data.spoilageRiskScore}`,
+      });
+    } catch (e: any) {
+      toast({
+        title: "AI scan error",
+        description: e?.message || "Failed to run AI safety scan.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsScanningById((prev) => ({ ...prev, [listing.id]: false }));
+    }
+  };
+
   const runAISafetyScan = async () => {
     if (!newListing.imageUrl) {
       toast({
@@ -383,16 +444,37 @@ export default function CanteenDashboard() {
   // Get canteen's food listings (filtered by user_id in real implementation)
   const canteenListings = foodListings;
 
-  // Create sorted listings for display
-  const sortedListings = [...canteenListings].sort((a, b) => {
-    // Always show expired foods at the bottom regardless of sorting
-    const aExpired = isExpired(a.expires);
-    const bExpired = isExpired(b.expires);
+  // Apply filters to listings first
+  const filteredListings = canteenListings.filter((listing) => {
+    // Safety filter
+    if (safetyFilter !== "all") {
+      if (safetyFilter === "none" && listing.safetyRating) return false;
+      if (
+        safetyFilter !== "none" &&
+        listing.safetyRating !== parseInt(safetyFilter)
+      )
+        return false;
+    }
 
-    if (aExpired && !bExpired) return 1;
-    if (!aExpired && bExpired) return -1;
+    // Event filter
+    if (selectedEventId && listing.eventId !== selectedEventId) return false;
 
-    // Apply user-selected sorting for non-expired foods
+    // Search filter
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const matches =
+        listing.name.toLowerCase().includes(q) ||
+        listing.quantity.toLowerCase().includes(q) ||
+        (listing.pickupLocation &&
+          listing.pickupLocation.toLowerCase().includes(q));
+      if (!matches) return false;
+    }
+
+    return true;
+  });
+
+  // Sort the filtered list
+  const sortedListings = [...filteredListings].sort((a, b) => {
     switch (sortConfig.key) {
       case "name":
         return sortConfig.direction === "asc"
@@ -408,9 +490,9 @@ export default function CanteenDashboard() {
         }
         return 0;
       case "status":
-        const statusOrder = { Available: 1, "Picked Up": 2, Expired: 3 };
-        const statusA = statusOrder[a.status] || 0;
-        const statusB = statusOrder[b.status] || 0;
+        const statusOrder = { Available: 1, "Picked Up": 2, Expired: 3 } as const;
+        const statusA = (statusOrder as any)[a.status] || 0;
+        const statusB = (statusOrder as any)[b.status] || 0;
         return sortConfig.direction === "asc"
           ? statusA - statusB
           : statusB - statusA;
@@ -859,11 +941,10 @@ export default function CanteenDashboard() {
                   </h3>
                   <p className="text-foreground">
                     Manage your current surplus food listings
-                    {searchQuery || safetyFilter !== "all" ? (
+                    {searchQuery || safetyFilter !== "all" || selectedEventId ? (
                       <span className="text-foreground/70">
                         {" "}
-                        (Showing {canteenListings.length} of{" "}
-                        {canteenListings.length} total)
+                        (Showing {sortedListings.length} of {canteenListings.length} total)
                       </span>
                     ) : null}
                   </p>
@@ -1057,8 +1138,11 @@ export default function CanteenDashboard() {
                         </TableHeader>
                         <TableBody>
                           {(() => {
-                            const nonExpiredListings = sortedListings.filter(
-                              (listing) => !isExpired(listing.expires)
+                            const activeListings = sortedListings.filter(
+                              (listing) => !isExpired(listing.expires) && listing.status !== "Picked Up"
+                            );
+                            const pickedUpListings = sortedListings.filter(
+                              (listing) => listing.status === "Picked Up"
                             );
                             const expiredListings = sortedListings.filter(
                               (listing) => isExpired(listing.expires)
@@ -1066,8 +1150,8 @@ export default function CanteenDashboard() {
 
                             return (
                               <>
-                                {/* Non-expired listings */}
-                                {nonExpiredListings.map((listing, index) => (
+                                {/* Active listings */}
+                                {activeListings.map((listing, index) => (
                                   <TableRow
                                     key={listing.id}
                                     className={`${
@@ -1125,25 +1209,251 @@ export default function CanteenDashboard() {
                                       </div>
                                     </TableCell>
                                     <TableCell className="py-3">
-                                      {listing.safetyRating ||
-                                      listing.temperature ||
-                                      (listing.allergens &&
-                                        listing.allergens.length > 0) ? (
-                                        <FoodSafetyTags
-                                          temperature={listing.temperature}
-                                          allergens={listing.allergens}
-                                          preparationMethod={
-                                            listing.preparationMethod
-                                          }
-                                          safetyRating={listing.safetyRating}
-                                          storageConditions={
-                                            listing.storageConditions
-                                          }
-                                        />
+                                      {aiScanByListing[listing.id] ? (
+                                        <div className="space-y-1 max-w-[260px]">
+                                          <div
+                                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getRiskBadgeClasses(
+                                              aiScanByListing[listing.id].riskLevel
+                                            )}`}
+                                          >
+                                            Risk: {aiScanByListing[listing.id].riskLevel} • Score {aiScanByListing[listing.id].spoilageRiskScore}
+                                          </div>
+                                          <div className="text-xs text-foreground/80 truncate">
+                                            {aiScanByListing[listing.id].recommendedAction}
+                                          </div>
+                                          <Popover>
+                                            <PopoverTrigger asChild>
+                                              <Button variant="link" className="px-0 h-auto text-xs">
+                                                <Eye className="h-3 w-3 mr-1" /> Details
+                                              </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-80">
+                                              <div className="text-sm space-y-2">
+                                                <div className="font-medium">AI Safety Assessment</div>
+                                                <div>Risk: {aiScanByListing[listing.id].riskLevel} (Score {aiScanByListing[listing.id].spoilageRiskScore})</div>
+                                                {aiScanByListing[listing.id].reasons?.length ? (
+                                                  <div>
+                                                    <div className="font-medium">Reasons:</div>
+                                                    <ul className="list-disc pl-5">
+                                                      {aiScanByListing[listing.id].reasons.map((r, i) => (
+                                                        <li key={i}>{r}</li>
+                                                      ))}
+                                                    </ul>
+                                                  </div>
+                                                ) : null}
+                                                {aiScanByListing[listing.id].suspiciousSigns?.length ? (
+                                                  <div>
+                                                    <div className="font-medium">Suspicious signs:</div>
+                                                    <ul className="list-disc pl-5">
+                                                      {aiScanByListing[listing.id].suspiciousSigns!.map((r, i) => (
+                                                        <li key={i}>{r}</li>
+                                                      ))}
+                                                    </ul>
+                                                  </div>
+                                                ) : null}
+                                                <div>
+                                                  <div className="font-medium">Recommended action:</div>
+                                                  <div>{aiScanByListing[listing.id].recommendedAction}</div>
+                                                </div>
+                                              </div>
+                                            </PopoverContent>
+                                          </Popover>
+                                        </div>
                                       ) : (
-                                        <span className="text-foreground text-sm italic">
-                                          No safety data
+                                        <div className="flex items-center gap-2">
+                                          {listing.safetyRating ||
+                                          listing.temperature ||
+                                          (listing.allergens && listing.allergens.length > 0) ? (
+                                            <FoodSafetyTags
+                                              temperature={listing.temperature}
+                                              allergens={listing.allergens}
+                                              preparationMethod={listing.preparationMethod}
+                                              safetyRating={listing.safetyRating}
+                                              storageConditions={listing.storageConditions}
+                                              hideSafetyRating
+                                            />
+                                          ) : (
+                                            <span className="text-foreground text-sm italic">No safety data</span>
+                                          )}
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => runAISafetyScanForListing(listing)}
+                                            disabled={!!isScanningById[listing.id]}
+                                          >
+                                            {isScanningById[listing.id] ? (
+                                              <>
+                                                <Loader2 className="h-3 w-3 animate-spin mr-1" /> Scanning
+                                              </>
+                                            ) : (
+                                              <>Scan</>
+                                            )}
+                                          </Button>
+                                        </div>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="py-3">
+                                      <div className="flex items-center justify-center gap-2">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => {
+                                            setEditingListing(listing);
+                                            setIsEditDialogOpen(true);
+                                          }}
+                                          className="h-8 w-8 p-0 hover:bg-primary/10 hover:scale-105 transition-all duration-200 group"
+                                        >
+                                          <Edit className="h-4 w-4 group-hover:text-primary transition-colors duration-200" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() =>
+                                            handleDeleteListing(listing.id)
+                                          }
+                                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-500/10 hover:scale-105 transition-all duration-200 group"
+                                        >
+                                          <Trash2 className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+
+                                {/* Picked Up listings */}
+                                {pickedUpListings.map((listing, index) => (
+                                  <TableRow
+                                    key={listing.id}
+                                    className={`${
+                                      index % 2 === 0
+                                        ? "bg-background hover:bg-muted"
+                                        : "bg-muted hover:bg-muted/80"
+                                    } transition-all duration-200 hover:shadow-sm`}
+                                  >
+                                    <TableCell className="font-medium py-3">
+                                      {listing.name}
+                                    </TableCell>
+                                    <TableCell className="py-3">
+                                      {listing.quantity}
+                                    </TableCell>
+                                    <TableCell className="py-3">
+                                      {listing.eventId ? (
+                                        <div className="flex items-center gap-2">
+                                          <Calendar className="h-4 w-4 text-blue-600" />
+                                          <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                                            {listing.eventName ||
+                                              "Unknown Event"}
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <span className="text-sm text-muted-foreground italic">
+                                          No event
                                         </span>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="py-3">
+                                      <div className="flex items-center gap-2">
+                                        <MapPin className="h-4 w-4 text-foreground" />
+                                        {listing.pickupLocation ||
+                                          "Not specified"}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="py-3">
+                                      <div className="flex items-center gap-2">
+                                        <Clock className="h-4 w-4 text-foreground" />
+                                        <span>
+                                          {formatExpiryDate(listing.expires)}
+                                        </span>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="py-3">
+                                      <div className="flex items-center gap-2">
+                                        {getStatusIcon(listing.status)}
+                                        {getStatusBadge(listing.status)}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="py-3">
+                                      {aiScanByListing[listing.id] ? (
+                                        <div className="space-y-1 max-w-[260px]">
+                                          <div
+                                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getRiskBadgeClasses(
+                                              aiScanByListing[listing.id].riskLevel
+                                            )}`}
+                                          >
+                                            Risk: {aiScanByListing[listing.id].riskLevel} • Score {aiScanByListing[listing.id].spoilageRiskScore}
+                                          </div>
+                                          <div className="text-xs text-foreground/80 truncate">
+                                            {aiScanByListing[listing.id].recommendedAction}
+                                          </div>
+                                          <Popover>
+                                            <PopoverTrigger asChild>
+                                              <Button variant="link" className="px-0 h-auto text-xs">
+                                                <Eye className="h-3 w-3 mr-1" /> Details
+                                              </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-80">
+                                              <div className="text-sm space-y-2">
+                                                <div className="font-medium">AI Safety Assessment</div>
+                                                <div>Risk: {aiScanByListing[listing.id].riskLevel} (Score {aiScanByListing[listing.id].spoilageRiskScore})</div>
+                                                {aiScanByListing[listing.id].reasons?.length ? (
+                                                  <div>
+                                                    <div className="font-medium">Reasons:</div>
+                                                    <ul className="list-disc pl-5">
+                                                      {aiScanByListing[listing.id].reasons.map((r, i) => (
+                                                        <li key={i}>{r}</li>
+                                                      ))}
+                                                    </ul>
+                                                  </div>
+                                                ) : null}
+                                                {aiScanByListing[listing.id].suspiciousSigns?.length ? (
+                                                  <div>
+                                                    <div className="font-medium">Suspicious signs:</div>
+                                                    <ul className="list-disc pl-5">
+                                                      {aiScanByListing[listing.id].suspiciousSigns!.map((r, i) => (
+                                                        <li key={i}>{r}</li>
+                                                      ))}
+                                                    </ul>
+                                                  </div>
+                                                ) : null}
+                                                <div>
+                                                  <div className="font-medium">Recommended action:</div>
+                                                  <div>{aiScanByListing[listing.id].recommendedAction}</div>
+                                                </div>
+                                              </div>
+                                            </PopoverContent>
+                                          </Popover>
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-center gap-2">
+                                          {listing.safetyRating ||
+                                          listing.temperature ||
+                                          (listing.allergens && listing.allergens.length > 0) ? (
+                                            <FoodSafetyTags
+                                              temperature={listing.temperature}
+                                              allergens={listing.allergens}
+                                              preparationMethod={listing.preparationMethod}
+                                              safetyRating={listing.safetyRating}
+                                              storageConditions={listing.storageConditions}
+                                              hideSafetyRating
+                                            />
+                                          ) : (
+                                            <span className="text-foreground text-sm italic">No safety data</span>
+                                          )}
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => runAISafetyScanForListing(listing)}
+                                            disabled={!!isScanningById[listing.id]}
+                                          >
+                                            {isScanningById[listing.id] ? (
+                                              <>
+                                                <Loader2 className="h-3 w-3 animate-spin mr-1" /> Scanning
+                                              </>
+                                            ) : (
+                                              <>Scan</>
+                                            )}
+                                          </Button>
+                                        </div>
                                       )}
                                     </TableCell>
                                     <TableCell className="py-3">
@@ -1223,25 +1533,87 @@ export default function CanteenDashboard() {
                                       </div>
                                     </TableCell>
                                     <TableCell className="py-3">
-                                      {listing.safetyRating ||
-                                      listing.temperature ||
-                                      (listing.allergens &&
-                                        listing.allergens.length > 0) ? (
-                                        <FoodSafetyTags
-                                          temperature={listing.temperature}
-                                          allergens={listing.allergens}
-                                          preparationMethod={
-                                            listing.preparationMethod
-                                          }
-                                          safetyRating={listing.safetyRating}
-                                          storageConditions={
-                                            listing.storageConditions
-                                          }
-                                        />
+                                      {aiScanByListing[listing.id] ? (
+                                        <div className="space-y-1 max-w-[260px]">
+                                          <div
+                                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getRiskBadgeClasses(
+                                              aiScanByListing[listing.id].riskLevel
+                                            )}`}
+                                          >
+                                            Risk: {aiScanByListing[listing.id].riskLevel} • Score {aiScanByListing[listing.id].spoilageRiskScore}
+                                          </div>
+                                          <div className="text-xs text-foreground/80 truncate">
+                                            {aiScanByListing[listing.id].recommendedAction}
+                                          </div>
+                                          <Popover>
+                                            <PopoverTrigger asChild>
+                                              <Button variant="link" className="px-0 h-auto text-xs">
+                                                <Eye className="h-3 w-3 mr-1" /> Details
+                                              </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-80">
+                                              <div className="text-sm space-y-2">
+                                                <div className="font-medium">AI Safety Assessment</div>
+                                                <div>Risk: {aiScanByListing[listing.id].riskLevel} (Score {aiScanByListing[listing.id].spoilageRiskScore})</div>
+                                                {aiScanByListing[listing.id].reasons?.length ? (
+                                                  <div>
+                                                    <div className="font-medium">Reasons:</div>
+                                                    <ul className="list-disc pl-5">
+                                                      {aiScanByListing[listing.id].reasons.map((r, i) => (
+                                                        <li key={i}>{r}</li>
+                                                      ))}
+                                                    </ul>
+                                                  </div>
+                                                ) : null}
+                                                {aiScanByListing[listing.id].suspiciousSigns?.length ? (
+                                                  <div>
+                                                    <div className="font-medium">Suspicious signs:</div>
+                                                    <ul className="list-disc pl-5">
+                                                      {aiScanByListing[listing.id].suspiciousSigns!.map((r, i) => (
+                                                        <li key={i}>{r}</li>
+                                                      ))}
+                                                    </ul>
+                                                  </div>
+                                                ) : null}
+                                                <div>
+                                                  <div className="font-medium">Recommended action:</div>
+                                                  <div>{aiScanByListing[listing.id].recommendedAction}</div>
+                                                </div>
+                                              </div>
+                                            </PopoverContent>
+                                          </Popover>
+                                        </div>
                                       ) : (
-                                        <span className="text-foreground text-sm italic">
-                                          No safety data
-                                        </span>
+                                        <div className="flex items-center gap-2">
+                                          {listing.safetyRating ||
+                                          listing.temperature ||
+                                          (listing.allergens && listing.allergens.length > 0) ? (
+                                            <FoodSafetyTags
+                                              temperature={listing.temperature}
+                                              allergens={listing.allergens}
+                                              preparationMethod={listing.preparationMethod}
+                                              safetyRating={listing.safetyRating}
+                                              storageConditions={listing.storageConditions}
+                                              hideSafetyRating
+                                            />
+                                          ) : (
+                                            <span className="text-foreground text-sm italic">No safety data</span>
+                                          )}
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => runAISafetyScanForListing(listing)}
+                                            disabled={!!isScanningById[listing.id]}
+                                          >
+                                            {isScanningById[listing.id] ? (
+                                              <>
+                                                <Loader2 className="h-3 w-3 animate-spin mr-1" /> Scanning
+                                              </>
+                                            ) : (
+                                              <>Scan</>
+                                            )}
+                                          </Button>
+                                        </div>
                                       )}
                                     </TableCell>
                                     <TableCell className="py-3">

@@ -21,6 +21,7 @@ interface FoodSafetyTagsProps {
   storageConditions?: string;
   lastInspection?: string;
   showDetails?: boolean;
+  hideSafetyRating?: boolean;
 }
 
 export function FoodSafetyTags({
@@ -31,6 +32,7 @@ export function FoodSafetyTags({
   storageConditions,
   lastInspection,
   showDetails = false,
+  hideSafetyRating = false,
 }: FoodSafetyTagsProps) {
   const getSafetyRatingColor = (rating: number) => {
     if (rating >= 4) return "bg-green-100 text-green-800 border-green-200";
@@ -65,7 +67,7 @@ export function FoodSafetyTags({
   return (
     <div className="space-y-3">
       {/* Safety Rating */}
-      {safetyRating && (
+      {safetyRating && !hideSafetyRating && (
         <div className="flex items-center gap-2">
           <Badge 
             variant="outline" 

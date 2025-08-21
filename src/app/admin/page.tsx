@@ -69,6 +69,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { useFoodListings, FoodListing } from "@/lib/food-listings-context";
+import { FoodSafetyTags } from "@/components/food-safety-tags";
 import { AuthGuard } from "@/components/auth-guard";
 import { RoleGuard } from "@/components/role-guard";
 import { FoodSafetyTags } from "@/components/food-safety-tags";
@@ -834,6 +835,7 @@ export default function AdminDashboard() {
                                     safetyRating={item.safetyRating}
                                     allergens={item.allergens}
                                     storageConditions={item.storageConditions}
+                                    hideSafetyRating
                                   />
                                 ) : (
                                   <span className="text-foreground/70 italic text-sm">
