@@ -72,7 +72,6 @@ import { useFoodListings, FoodListing } from "@/lib/food-listings-context";
 import { FoodSafetyTags } from "@/components/food-safety-tags";
 import { AuthGuard } from "@/components/auth-guard";
 import { RoleGuard } from "@/components/role-guard";
-import { FoodSafetyTags } from "@/components/food-safety-tags";
 import { TypeAnimation } from "@/components/ui/type-animation";
 import { Particles } from "@/components/ui/particles";
 import { AnimatedList } from "@/components/ui/animated-list";
