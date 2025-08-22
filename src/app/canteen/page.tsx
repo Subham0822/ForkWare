@@ -185,13 +185,16 @@ export default function CanteenDashboard() {
       const fileName = `${unique}-${Date.now()}.${extFromType}`;
       const path = `listings/${fileName}`;
       const { error } = await supabase.storage
-        .from("food-images")
+        .from("food-images") // Make sure this bucket exists in your Supabase project
         .upload(path, selectedImage, {
           contentType: selectedImage.type || "image/jpeg",
           upsert: false,
           cacheControl: "3600",
         });
-      if (error) throw error;
+      if (error) {
+        console.error("Storage upload error:", error);
+        throw error;
+      }
       const { data } = supabase.storage.from("food-images").getPublicUrl(path);
       const publicUrl = data?.publicUrl;
       if (!publicUrl) throw new Error("Failed to get public URL");
@@ -201,9 +204,19 @@ export default function CanteenDashboard() {
         description: "Linked to this listing.",
       });
     } catch (e: any) {
+      console.error("Image upload error:", e);
+      let errorMessage = e?.message || "Please try again.";
+      
+      // Provide helpful error message for bucket issues
+      if (e?.message?.includes("Bucket not found")) {
+        errorMessage = "Storage bucket 'food-images' not found. Please create it in your Supabase project.";
+      } else if (e?.message?.includes("permission denied")) {
+        errorMessage = "Permission denied. Check your authentication status.";
+      }
+      
       toast({
         title: "Upload failed",
-        description: e?.message || "Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -230,13 +243,16 @@ export default function CanteenDashboard() {
       const fileName = `${unique}-${Date.now()}.${extFromType}`;
       const path = `listings/${fileName}`;
       const { error } = await supabase.storage
-        .from("food-images")
+        .from("food-images") // Make sure this bucket exists in your Supabase project
         .upload(path, editSelectedImage, {
           contentType: editSelectedImage.type || "image/jpeg",
           upsert: false,
           cacheControl: "3600",
         });
-      if (error) throw error;
+      if (error) {
+        console.error("Storage upload error:", error);
+        throw error;
+      }
       const { data } = supabase.storage.from("food-images").getPublicUrl(path);
       const publicUrl = data?.publicUrl;
       if (!publicUrl) throw new Error("Failed to get public URL");
@@ -246,9 +262,19 @@ export default function CanteenDashboard() {
         description: "Linked to this listing.",
       });
     } catch (e: any) {
+      console.error("Edit image upload error:", e);
+      let errorMessage = e?.message || "Please try again.";
+      
+      // Provide helpful error message for bucket issues
+      if (e?.message?.includes("Bucket not found")) {
+        errorMessage = "Storage bucket 'food-images' not found. Please create it in your Supabase project.";
+      } else if (e?.message?.includes("permission denied")) {
+        errorMessage = "Permission denied. Check your authentication status.";
+      }
+      
       toast({
         title: "Upload failed",
-        description: e?.message || "Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -687,6 +713,89 @@ export default function CanteenDashboard() {
         title: "Error",
         description: "Failed to delete food listing. Please try again.",
         variant: "destructive",
+      });
+    }
+  };
+
+  const handleUpdateLocation = async (listing: FoodListing) => {
+    try {
+      let latitude: number | null = null;
+      let longitude: number | null = null;
+
+      // First try to get GPS location
+      try {
+        if (navigator.geolocation) {
+          const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: true,
+              maximumAge: 30000,
+              timeout: 10000,
+            });
+          });
+          latitude = pos.coords.latitude;
+          longitude = pos.coords.longitude;
+          toast({
+            title: "Location detected",
+            description: "Using your device's GPS location.",
+          });
+        }
+      } catch (error) {
+        console.log("GPS location failed, will use address geocoding");
+      }
+
+      // If GPS failed, try to geocode the pickup location address
+      if ((latitude === null || longitude === null) && listing.pickupLocation) {
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(listing.pickupLocation)}&limit=1`
+          );
+          const data = await res.json();
+          
+          if (Array.isArray(data) && data.length > 0) {
+            latitude = parseFloat(data[0].lat);
+            longitude = parseFloat(data[0].lon);
+            toast({
+              title: "Address geocoded",
+              description: "Location found from pickup address.",
+            });
+          }
+        } catch (error) {
+          console.error("Geocoding failed:", error);
+        }
+      }
+
+      // Update the listing with coordinates if we have them
+      if (latitude !== null && longitude !== null) {
+        // Update the food listing coordinates
+        await updateFoodListing(listing.id, { latitude, longitude });
+        
+        // Send notifications to nearby users
+        await fetch("/api/events/notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            listingId: listing.id,
+            radiusKm: 5 
+          }),
+        });
+
+        toast({
+          title: "Location updated successfully",
+          description: "Coordinates saved and nearby users notified.",
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Location unavailable",
+          description: "Please enable location permissions or ensure pickup address is valid.",
+        });
+      }
+    } catch (error) {
+      console.error("Location update failed:", error);
+      toast({
+        variant: "destructive",
+        title: "Failed to update location",
+        description: "Please try again or contact support.",
       });
     }
   };
@@ -1302,8 +1411,18 @@ export default function CanteenDashboard() {
                                             setIsEditDialogOpen(true);
                                           }}
                                           className="h-8 w-8 p-0 hover:bg-primary/10 hover:scale-105 transition-all duration-200 group"
+                                          title="Edit listing"
                                         >
                                           <Edit className="h-4 w-4 group-hover:text-primary transition-colors duration-200" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => handleUpdateLocation(listing)}
+                                          className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-500/10 hover:scale-105 transition-all duration-200 group"
+                                          title="Update location and notify nearby users"
+                                        >
+                                          <MapPin className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
                                         </Button>
                                         <Button
                                           variant="ghost"
@@ -1312,6 +1431,7 @@ export default function CanteenDashboard() {
                                             handleDeleteListing(listing.id)
                                           }
                                           className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-500/10 hover:scale-105 transition-all duration-200 group"
+                                          title="Delete listing"
                                         >
                                           <Trash2 className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
                                         </Button>
@@ -1466,8 +1586,18 @@ export default function CanteenDashboard() {
                                             setIsEditDialogOpen(true);
                                           }}
                                           className="h-8 w-8 p-0 hover:bg-primary/10 hover:scale-105 transition-all duration-200 group"
+                                          title="Edit listing"
                                         >
                                           <Edit className="h-4 w-4 group-hover:text-primary transition-colors duration-200" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => handleUpdateLocation(listing)}
+                                          className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-500/10 hover:scale-105 transition-all duration-200 group"
+                                          title="Update location and notify nearby users"
+                                        >
+                                          <MapPin className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
                                         </Button>
                                         <Button
                                           variant="ghost"
@@ -1476,6 +1606,7 @@ export default function CanteenDashboard() {
                                             handleDeleteListing(listing.id)
                                           }
                                           className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-500/10 hover:scale-105 transition-all duration-200 group"
+                                          title="Delete listing"
                                         >
                                           <Trash2 className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
                                         </Button>
@@ -1626,8 +1757,18 @@ export default function CanteenDashboard() {
                                             setIsEditDialogOpen(true);
                                           }}
                                           className="h-8 w-8 p-0 hover:bg-primary/10 hover:scale-105 transition-all duration-200 group"
+                                          title="Edit listing"
                                         >
                                           <Edit className="h-4 w-4 group-hover:text-primary transition-colors duration-200" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => handleUpdateLocation(listing)}
+                                          className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-500/10 hover:scale-105 transition-all duration-200 group"
+                                          title="Update location and notify nearby users"
+                                        >
+                                          <MapPin className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
                                         </Button>
                                         <Button
                                           variant="ghost"
@@ -1636,6 +1777,7 @@ export default function CanteenDashboard() {
                                             handleDeleteListing(listing.id)
                                           }
                                           className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-500/10 hover:scale-105 transition-all duration-200 group"
+                                          title="Delete listing"
                                         >
                                           <Trash2 className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
                                         </Button>

@@ -30,6 +30,7 @@ function LoginPageContent() {
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showSignupPassword, setShowSignupPassword] = useState(false);
 
+
   const [loginState, loginAction, isLoginPending] = useActionState(login, null);
   const [signupState, signupAction, isSignupPending] = useActionState(
     signup,
@@ -200,6 +201,7 @@ function LoginPageContent() {
               </CardFooter>
             </Card>
           </form>
+
         </TabsContent>
         <TabsContent value="signup">
           <form action={signupAction}>

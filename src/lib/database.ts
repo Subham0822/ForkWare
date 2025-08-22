@@ -7,6 +7,8 @@ export interface User {
   role: string;
   verified: boolean;
   desired_role?: string;
+  latitude?: number;
+  longitude?: number;
   created_at: string;
   updated_at: string;
 }
@@ -21,6 +23,9 @@ export interface FoodListing {
   status: "available" | "picked_up" | "expired";
   image_url?: string;
   created_at: string;
+  // Location coordinates for distance calculations
+  latitude?: number;
+  longitude?: number;
   // Food Safety Fields
   temperature?: string;
   allergens?: string[];
@@ -51,6 +56,8 @@ export interface Event {
   end_time: string;
   venue: string;
   venue_address?: string;
+  latitude?: number;
+  longitude?: number;
   organizer_id: string;
   organizer_name: string;
   organizer_contact: string;
@@ -143,7 +150,7 @@ export interface EventSummary {
 
 // User management functions
 export async function createUser(
-  userData: Omit<User, "id" | "created_at" | "updated_at">
+  userData: Omit<User, "created_at" | "updated_at">
 ) {
   const { data, error } = await supabase
     .from("profiles")
@@ -298,9 +305,46 @@ export async function updateFoodListing(
   id: string,
   updates: Partial<FoodListing>
 ) {
+  console.log("updateFoodListing called with:", { id, updates });
+  
+  try {
+    const { data, error } = await supabase
+      .from("food_listings")
+      .update(updates)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Supabase error in updateFoodListing:", error);
+      console.error("Error details:", {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        stack: error.stack,
+      });
+      throw new Error(`Database update failed: ${error.message} (Code: ${error.code})`);
+    }
+    return data;
+  } catch (error) {
+    console.error("Exception in updateFoodListing:", error);
+    if (error instanceof Error) {
+      throw error;
+    } else {
+      throw new Error(`Unknown error in updateFoodListing: ${String(error)}`);
+    }
+  }
+}
+
+export async function updateFoodListingLocation(
+  id: string,
+  latitude: number,
+  longitude: number
+) {
   const { data, error } = await supabase
     .from("food_listings")
-    .update(updates)
+    .update({ latitude, longitude })
     .eq("id", id)
     .select()
     .single();

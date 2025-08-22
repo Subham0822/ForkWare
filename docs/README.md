@@ -27,3 +27,74 @@
 - **Interactive Dashboards**: Comprehensive visualization and insights
 
 *Perfect for judges who love ML/AI implementations!* 🎯
+
+## Environment Variables
+
+Create `.env.local` with:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+
+# Gmail SMTP (App Password, not OAuth)
+GMAIL_USER=your@gmail.com
+GMAIL_APP_PASSWORD=your-app-password
+# Optional overrides
+EMAIL_FROM=notifications@yourdomain.com
+EMAIL_FROM_NAME=ForkWare
+```
+
+## Nearby Email Notifications (PostGIS)
+
+To notify users within a radius when a surplus listing is posted, enable PostGIS and add an RPC in Supabase.
+
+Run the following in Supabase SQL editor (one-time):
+
+```sql
+-- 1) Enable PostGIS
+create extension if not exists postgis;
+
+-- 2) Coordinates on events and profiles (if not present)
+alter table if exists public.events
+  add column if not exists latitude double precision,
+  add column if not exists longitude double precision;
+
+alter table if exists public.profiles
+  add column if not exists latitude double precision,
+  add column if not exists longitude double precision;
+
+-- 3) RPC to get profiles within radius (km)
+create or replace function public.profiles_within_radius(
+  center_lat double precision,
+  center_lon double precision,
+  radius_km double precision
+)
+returns table (
+  id uuid,
+  name text,
+  email text,
+  latitude double precision,
+  longitude double precision,
+  distance_km double precision
+) as $$
+  select p.id,
+         p.name,
+         p.email,
+         p.latitude,
+         p.longitude,
+         ST_DistanceSphere(
+           ST_MakePoint(center_lon, center_lat),
+           ST_MakePoint(p.longitude, p.latitude)
+         ) / 1000.0 as distance_km
+  from public.profiles p
+  where p.latitude is not null
+    and p.longitude is not null
+    and ST_DistanceSphere(
+          ST_MakePoint(center_lon, center_lat),
+          ST_MakePoint(p.longitude, p.latitude)
+        ) <= radius_km * 1000.0;
+$$ language sql stable;
+```
+
+When `POST /api/events/[id]/listings` creates a listing, the server asynchronously emails all profiles within 5 km of the event location.

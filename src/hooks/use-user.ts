@@ -12,6 +12,8 @@ interface UserProfile {
   role: string;
   verified: boolean;
   desiredRole?: string;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 interface UserPayload {

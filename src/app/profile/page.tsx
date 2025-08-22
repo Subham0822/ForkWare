@@ -21,13 +21,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { FormEvent, useEffect } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { AuthGuard } from "@/components/auth-guard";
+import { MapPin } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 export default function ProfilePage() {
   const router = useRouter();
   const { user, loading, mutate } = useUser();
   const { toast } = useToast();
+  const [address, setAddress] = useState("");
+  const [updatingLocation, setUpdatingLocation] = useState(false);
 
   // Handle redirect if user is not authenticated
   useEffect(() => {
@@ -196,6 +200,122 @@ export default function ProfilePage() {
                 </Card>
               </form>
             )}
+
+            {/* Location Settings */}
+            <Card className="bg-muted/50">
+              <CardHeader>
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <MapPin className="h-5 w-5" />
+                  Location Settings
+                </CardTitle>
+                <CardDescription>
+                  We use your location to notify you about nearby surplus food. Update your coordinates to receive relevant notifications.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Enter address (e.g. Building, Street, City)"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={async () => {
+                      try {
+                        setUpdatingLocation(true);
+                        
+                        // First try browser geolocation for highest accuracy
+                        let latitude: number | null = null;
+                        let longitude: number | null = null;
+
+                        try {
+                          if (navigator.geolocation) {
+                            const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+                              navigator.geolocation.getCurrentPosition(resolve, reject, {
+                                enableHighAccuracy: true,
+                                maximumAge: 30000,
+                                timeout: 10000,
+                              });
+                            });
+                            latitude = pos.coords.latitude;
+                            longitude = pos.coords.longitude;
+                            toast({ 
+                              title: "Location detected", 
+                              description: "Using your device's GPS location." 
+                            });
+                          }
+                        } catch (error) {
+                          console.log("GPS location failed, trying address geocoding...");
+                        }
+
+                        // If GPS failed or wasn't available, try address geocoding
+                        if ((latitude === null || longitude === null) && address.trim()) {
+                          try {
+                            const res = await fetch(
+                              `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`
+                            );
+                            const data = await res.json();
+                            
+                            if (Array.isArray(data) && data.length > 0) {
+                              latitude = parseFloat(data[0].lat);
+                              longitude = parseFloat(data[0].lon);
+                              toast({ 
+                                title: "Address geocoded", 
+                                description: "Location found from your address." 
+                              });
+                            }
+                          } catch (error) {
+                            console.error("Geocoding failed:", error);
+                          }
+                        }
+
+                        // Save location if we have coordinates
+                        if (latitude !== null && longitude !== null) {
+                          const response = await fetch("/api/users/location", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ latitude, longitude }),
+                          });
+
+                          if (response.ok) {
+                            toast({ 
+                              title: "Location updated successfully", 
+                              description: "You'll now receive notifications for nearby surplus food." 
+                            });
+                            setAddress(""); // Clear the address input
+                          } else {
+                            throw new Error("Failed to save location");
+                          }
+                        } else {
+                          toast({ 
+                            variant: "destructive", 
+                            title: "Location unavailable", 
+                            description: "Please enable location permissions or enter a valid address." 
+                          });
+                        }
+                      } catch (error) {
+                        console.error("Location update failed:", error);
+                        toast({ 
+                          variant: "destructive", 
+                          title: "Failed to update location", 
+                          description: "Please try again or contact support." 
+                        });
+                      } finally {
+                        setUpdatingLocation(false);
+                      }
+                    }}
+                    disabled={updatingLocation}
+                  >
+                    {updatingLocation ? "Updating..." : "Set my location"}
+                  </Button>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Your coordinates are only used to find nearby food postings. You can update them anytime.
+                </div>
+              </CardContent>
+            </Card>
           </CardContent>
           <CardFooter>
             <form action={handleLogout} className="w-full">

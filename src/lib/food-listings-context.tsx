@@ -30,6 +30,9 @@ export interface FoodListing {
   image?: string;
   hint?: string;
   eventId?: string;
+  // Location coordinates for distance calculations
+  latitude?: number;
+  longitude?: number;
   // Food Safety Fields
   temperature?: string;
   allergens?: string[];
@@ -80,6 +83,9 @@ const convertDBToListing = (dbListing: DBFoodListing): FoodListing => {
     createdAt: dbListing.created_at,
     hint: dbListing.food_name.toLowerCase(),
     eventId: dbListing.events ? dbListing.event_id : undefined,
+    // Location coordinates
+    latitude: dbListing.latitude,
+    longitude: dbListing.longitude,
     // Food Safety Fields
     temperature: dbListing.temperature,
     allergens: dbListing.allergens,
@@ -148,6 +154,9 @@ const convertListingToDB = async (
         : "expired",
     image_url: listing.imageUrl,
     event_id: listing.eventId,
+    // Location coordinates
+    latitude: listing.latitude,
+    longitude: listing.longitude,
     // Food Safety Fields
     temperature: listing.temperature,
     allergens: listing.allergens,
@@ -267,6 +276,11 @@ export function FoodListingsProvider({ children }: { children: ReactNode }) {
             : "expired";
       }
       if (updates.imageUrl) dbUpdates.image_url = updates.imageUrl;
+      // Map coordinate fields to DB
+      if (typeof updates.latitude !== "undefined")
+        dbUpdates.latitude = updates.latitude;
+      if (typeof updates.longitude !== "undefined")
+        dbUpdates.longitude = updates.longitude;
       // Map safety fields to DB
       if (typeof updates.safetyRating !== "undefined")
         dbUpdates.safety_rating = updates.safetyRating;
@@ -281,6 +295,12 @@ export function FoodListingsProvider({ children }: { children: ReactNode }) {
       if (typeof updates.lastInspection !== "undefined")
         dbUpdates.last_inspection = updates.lastInspection;
 
+      console.log("About to call updateFoodListingDB with:", { id, dbUpdates });
+      
+      // Log the exact structure being sent
+      console.log("dbUpdates keys:", Object.keys(dbUpdates));
+      console.log("dbUpdates values:", Object.values(dbUpdates));
+      
       await updateFoodListingDB(id, dbUpdates);
 
       setFoodListings((prev) =>
@@ -293,10 +313,26 @@ export function FoodListingsProvider({ children }: { children: ReactNode }) {
       });
     } catch (error) {
       console.error("Failed to update food listing:", error);
+      
+      // Provide more specific error messages
+      let errorMessage = "Failed to update food listing.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        
+        // Check for specific database errors
+        if (error.message.includes("column") && error.message.includes("does not exist")) {
+          errorMessage = "Database schema needs to be updated. Please add latitude/longitude columns.";
+        } else if (error.message.includes("permission denied")) {
+          errorMessage = "Permission denied. Check your authentication status.";
+        } else if (error.message.includes("not authenticated")) {
+          errorMessage = "Please log in to update food listings.";
+        }
+      }
+      
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to update food listing.",
+        description: errorMessage,
       });
     }
   };
