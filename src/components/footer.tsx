@@ -35,12 +35,12 @@ export function Footer() {
               </Link>
             </div>
             <div className="flex gap-6 text-sm">
-              <Link
+              {/* <Link
                 href="mailto:rwik0822@gmail.com"
                 className="text-muted-foreground hover:text-foreground"
               >
                 Contact
-              </Link>
+              </Link> */}
               <Link
                 href="#"
                 className="text-muted-foreground hover:text-foreground"
